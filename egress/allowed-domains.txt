@@ -1,0 +1,7 @@
+alexa.amazon.es
+eu-api-alexa.amazon.es
+alexa-comms-mobile-service.amazon.es
+www.amazon.es
+api.amazon.com
+www.amazon.com
+api.amazonalexa.com

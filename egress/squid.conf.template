@@ -1,0 +1,25 @@
+# Exact domain comparison before the DNS-dependent destination ACL.
+http_port @PROXY_IP@:3128
+visible_hostname alexa-egress
+acl client src @CLIENT_IP@/32
+acl tls_port port 443
+acl approved dstdomain -n "/etc/alexa-egress/allowed-domains.txt"
+acl blocked_dst dst @BLOCKED_IPV4@ ::/0
+http_access deny !client
+http_access deny !CONNECT
+http_access deny !tls_port
+http_access deny !approved
+http_access deny blocked_dst
+http_access allow client CONNECT tls_port approved
+http_access deny all
+
+dns_nameservers 1.1.1.1 1.0.0.1
+cache deny all
+cache_mem 8 MB
+maximum_object_size_in_memory 0 KB
+access_log none
+cache_log /dev/null
+cache_store_log none
+pid_filename none
+coredump_dir /tmp
+shutdown_lifetime 1 seconds
