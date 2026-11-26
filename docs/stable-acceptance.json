@@ -1,6 +1,6 @@
 {
   "approvedVersion": null,
   "renewalVerified": false,
-  "anonymousPullVerified": false,
-  "residualRisksAccepted": false
+  "anonymousPullVerified": true,
+  "residualRisksAccepted": true
 }

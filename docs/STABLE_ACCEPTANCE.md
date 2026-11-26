@@ -19,7 +19,7 @@ an independent network trace. No private inventory or credentials are recorded.
 | Credential persistence and permissions | File replacement observed; mode 0600 and expected owner preserved |
 | Natural renewal | RC.1 updated access token and cookies, retained refresh token; RC.2 reused session |
 | Natural renewal specifically in RC.2 | Pending |
-| Anonymous registry pull | Not independently confirmed |
+| Anonymous registry pull | Passed, explicitly confirmed by maintainer on 2026-11-26 |
 | Host startup and basic performance | Passed short initial trial; not long-term testing |
 
 The supervised performance trial measured 199 ms MCP startup (excluding
@@ -34,10 +34,12 @@ test client and server, not power draw. Keep the existing 384 MiB limit.
 - [ ] Confirm natural renewal in RC.2 (do not edit tokenDate or force login).
   Verify newer tokenDate, successful read, preserved permissions and
   safe session reuse; record only sanitized results.
-- [ ] Verify anonymous pull of the reviewed RC.2 digest.
-- [ ] Maintainer explicitly accepts supervised local inventory scope,
+- [x] Anonymous pull of the reviewed RC.2 digest confirmed by the maintainer.
+- [x] Maintainer explicitly accepted the six documented limitations on 2026-11-26:
+  supervised local read-only inventory scope,
   unavailable live device state, short-duration performance evidence,
-  unofficial API risk, and remaining unfixed high-severity findings.
+  unofficial API risk, remaining unfixed high-severity findings, and no
+  autonomous agent access before egress controls and a restricted gateway.
 - [ ] Record completed evidence and update stable-acceptance.json:
   approvedVersion exactly matches package.json, all three booleans true.
   Review and merge through the normal PR process. Do not mark checks true
