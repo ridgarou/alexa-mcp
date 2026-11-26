@@ -2,6 +2,17 @@
 
 ## Published candidates
 
+### 1.0.0-rc.1 (current candidate)
+
+- Published 2026-11-26, source commit `3906b98`.
+- [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405).
+- Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.1`.
+- Image: `ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d`.
+- All validation and the registry push passed, including authenticated manifest inspection.
+- Anonymous pull and live host acceptance remain pending.
+
+### Historical candidate
+
 - `0.7.0-hardened.1-rc.1` — 2026-11-26, source commit `360ad51`.
 - [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
 - Tag: `0.7.0-hardened.1-rc.1-360ad516ead8-45766872771-1`.

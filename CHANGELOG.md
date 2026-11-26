@@ -7,6 +7,19 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-11-26
+
+First published candidate under independent SemVer. This is not a stable release.
+
+- Source commit: [3906b98](https://github.com/ridgarou/alexa-mcp/commit/3906b98bca312c719d4e3668f72623604cd83414).
+- Publication: [workflow run 45770005405](https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405).
+- Container tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.1`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d`.
+- Publication passed 18 unit tests, both 15-tool MCP checks (including version consistency), npm audit (zero vulnerabilities), 157 registry signatures and 18 attestations.
+- Trivy reported 52 high findings without available fixes (13 distinct advisories), zero critical and zero fixable findings.
+- PR #6 initially failed the eventsource-parser@3.1.0 attestation check; [attempt 2](https://github.com/ridgarou/alexa-mcp/actions/runs/45769177880/attempts/2) and publication passed with unchanged dependencies and security gates. The cause remains undetermined.
+- Registry push and authenticated manifest inspection passed. Anonymous pull, live Amazon authentication/refresh, host acceptance and stable promotion remain pending.
+
 ### Added
 
 - Repository-wide [AGENTS.md](AGENTS.md) instructions and an [architecture decision log](docs/DECISIONS.md) to preserve maintainer requirements, security boundaries, independent versioning, cost constraints and release acceptance criteria across contributors and agents.
@@ -17,7 +30,7 @@ container release versions are tracked separately.
 - Use package.json as the application version source and verify the lockfile, MCP handshake and OCI image metadata agree.
 - Publish simple version tags without the hardened suffix; reject an already published tag. Deploy by digest as before.
 - Update project metadata to point to the fork and mark the npm package private to prevent accidental npm publication.
-- Preserve the previously published candidate and its digest; the new candidate requires a new validated build.
+- Preserve the previously published candidate and its digest; this candidate was built and validated separately.
 
 ## [0.7.0-hardened.1-rc.1] - 2026-11-26
 
@@ -162,5 +175,6 @@ The original MIT license and attribution are retained.
   corresponding tag or release. Keep an empty Unreleased section at the top.
 - Do not record credentials, private host configuration or personal data.
 
-[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/360ad516ead85826e1ef3a735c56364f213b7859...develop
+[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/3906b98bca312c719d4e3668f72623604cd83414...develop
+[1.0.0-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405
 [0.7.0-hardened.1-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771

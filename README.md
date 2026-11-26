@@ -14,8 +14,8 @@ tools remain available in the source but are not exposed by the supplied
 Docker configuration.
 
 > **Versioning:** this fork follows independent [Semantic Versioning](https://semver.org/),
-> starting at `1.0.0-rc.1`. The previous `0.7.0-hardened.1-rc.1` image
-> remains published under its historical name; the new version is not yet published.
+> starting at `1.0.0-rc.1`, now published to GHCR. The previous
+> `0.7.0-hardened.1-rc.1` image remains available under its historical name.
 > This is not a stable release. The maintainer confirmed public package visibility; anonymous pulls must
 > still be verified before use; live Amazon authentication, refresh and host-specific
 > network controls still require validation. Do not replace a working production
@@ -64,12 +64,12 @@ Docker configuration.
 ### 1. Obtain the Compose files and build the candidate
 
 For development and review, obtain the fork's main branch and check out
-the source commit used to publish the first candidate:
+the source commit used to publish the current candidate:
 
 ```bash
 git clone https://github.com/ridgarou/alexa-mcp.git
 cd alexa-mcp
-git checkout --detach 360ad516ead85826e1ef3a735c56364f213b7859
+git checkout --detach 3906b98bca312c719d4e3668f72623604cd83414
 cp .env.example .env
 docker compose version
 ```
@@ -136,16 +136,16 @@ an always-running background container.
 
 ### Using GHCR instead of a local build
 
-The first candidate was published on 2026-11-26 in
-[workflow run 45766872771](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
-The maintainer confirmed public visibility. This is the historical candidate digest;
-use it only for that version. The new `1.0.0-rc.1` digest will be recorded after publication:
+Version `1.0.0-rc.1` was published on 2026-11-26 in
+[workflow run 45770005405](https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405).
+The public package was previously confirmed by the maintainer; verify anonymous
+access before deployment. Use this immutable image reference:
 
 ```dotenv
-ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5
+ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d
 ```
 
-Use the corresponding Compose files from source commit 360ad51.
+Use the corresponding Compose files from source commit 3906b98.
 Public packages can be pulled without a PAT after their public visibility
 has been verified. If the pull returns an authorization error, check
 package visibility rather than embedding credentials in Compose.
