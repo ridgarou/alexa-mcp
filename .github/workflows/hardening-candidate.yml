@@ -40,3 +40,12 @@ jobs:
           docker compose -f compose.yml config --format json > /tmp/compose.json
           docker compose -f compose.yml -f compose.auth.yml config --format json > /tmp/compose-auth.json
           python3 -c 'import json; a=json.load(open("/tmp/compose.json"))["services"]["AlexaMCP"]; b=json.load(open("/tmp/compose-auth.json"))["services"]["AlexaMCP"]; assert not a.get("ports"); assert b["ports"][0]["host_ip"]=="127.0.0.1"; assert a["read_only"]'
+      - name: Scan runtime image
+        run: |
+          docker save -o /tmp/alexa-image.tar local/alexa-mcp:hardened-candidate
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges:true -v /tmp/alexa-image.tar:/scan/image.tar:ro aquasec/trivy:0.76.2 image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --format json --timeout 10m > /tmp/trivy-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-trivy-report
+          path: /tmp/trivy-report.json
+          if-no-files-found: error
