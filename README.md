@@ -1,6 +1,6 @@
 # alexa-mcp — hardened Docker fork
 
-[![Hardened validation](https://github.com/ridgarou/alexa-mcp/actions/workflows/hardening-candidate.yml/badge.svg?branch=feature%2Fsecurity-hardening)](https://github.com/ridgarou/alexa-mcp/actions/workflows/hardening-candidate.yml)
+[![Hardened validation](https://github.com/ridgarou/alexa-mcp/actions/workflows/hardening-candidate.yml/badge.svg?branch=main)](https://github.com/ridgarou/alexa-mcp/actions/workflows/hardening-candidate.yml)
 
 An [MCP](https://modelcontextprotocol.io) server for auditing Amazon Alexa
 routines, smart-home devices, scenes, groups and broken references.
@@ -13,10 +13,11 @@ Compose configuration is read-only at the MCP tool level. Upstream write
 tools remain available in the source but are not exposed by the supplied
 Docker configuration.
 
-> **Candidate status:** no GHCR image or stable release has been published
-> yet. The current development branch has passed offline CI, but live
-> Amazon authentication, refresh and host-specific network controls still
-> require validation. Do not replace a working production deployment yet.
+> **Candidate status:** `0.7.0-hardened.1-rc.1` has been published to GHCR.
+> This is not a stable release. Registry visibility and anonymous pulls must
+> be verified before use; live Amazon authentication, refresh and host-specific
+> network controls still require validation. Do not replace a working production
+> deployment yet. See [CHANGELOG.md](CHANGELOG.md).
 >
 > This project is not affiliated with or supported by Amazon. It uses
 > undocumented APIs that can change without notice, and its use may be
@@ -53,11 +54,13 @@ Docker configuration.
 
 ### 1. Obtain the Compose files and build the candidate
 
-For development and review only, obtain the current candidate branch:
+For development and review, obtain the fork's main branch and check out
+the source commit used to publish the first candidate:
 
 ```bash
-git clone --branch feature/security-hardening https://github.com/ridgarou/alexa-mcp.git
+git clone https://github.com/ridgarou/alexa-mcp.git
 cd alexa-mcp
+git checkout --detach 360ad516ead85826e1ef3a735c56364f213b7859
 cp .env.example .env
 docker compose version
 ```
@@ -122,19 +125,20 @@ The normal service is named `AlexaMCP` (case-sensitive). It uses MCP over
 **stdio**, not HTTP. It does not need a reverse proxy, a web dashboard or
 an always-running background container.
 
-### Using GHCR instead of a local build (after publication)
+### Using GHCR instead of a local build
 
-When a reviewed candidate is published, use its exact registry digest
-from the successful publication workflow:
+The first candidate was published on 2026-11-26 in
+[workflow run 45766872771](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
+After verifying package visibility and access, use its exact registry digest:
 
 ```dotenv
-ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:<reviewed-digest>
+ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5
 ```
 
-Replace the placeholder with the real digest; there is no available
-release digest at the time of writing. Use the corresponding Compose
-files from the reviewed source version. Public packages can be pulled
-without a PAT after their public visibility has been verified.
+Use the corresponding Compose files from source commit 360ad51.
+Public packages can be pulled without a PAT after their public visibility
+has been verified. If the pull returns an authorization error, check
+package visibility rather than embedding credentials in Compose.
 
 ```bash
 docker compose -f compose.yml pull AlexaMCP
@@ -334,7 +338,7 @@ directory as part of a routine update.
 | Authentication page unreachable | Verify SSH forwarding, temporary container and loopback publication; do not expose a LAN port. |
 | Existing session prevents login | The guard is intentional. Review revocation and local credential handling before attempting a fresh login. |
 | Permission denied writing credentials | Check the mounted directory is writable by the container UID/GID and has the expected private permissions. |
-| Image not found | Build the local image first, or use a real, reviewed GHCR digest once published. |
+| Image not found | Build the local image first, or use the reviewed GHCR digest once access has been verified. |
 | Client cannot launch Docker | Check local launcher permissions and absolute paths. Do not solve this by giving an untrusted agent a Docker socket. |
 | No logs from authentication | Output is intentionally suppressed. Use only sanitized diagnostics. |
 

@@ -7,8 +7,19 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
-Initial hardening work, targeting candidate `0.7.0-hardened.1-rc.1`.
-No candidate image or stable release has been published yet.
+## [0.7.0-hardened.1-rc.1] - 2026-11-26
+
+Initial hardened container candidate, published to GHCR. This is not a
+stable release. The registry push and authenticated manifest inspection
+succeeded; anonymous pull and live Amazon integration remain unverified.
+
+- Source commit: [360ad51](https://github.com/ridgarou/alexa-mcp/commit/360ad516ead85826e1ef3a735c56364f213b7859).
+- Publication: [workflow run 45766872771](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
+- Container tag: `0.7.0-hardened.1-rc.1-360ad516ead8-45766872771-1`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5`.
+- Publication validation: 157 registry signatures, 18 attestations and
+  18 unit tests passed. Trivy reported 52 high findings without available
+  fixes (13 unique advisories), zero critical and zero fixable findings.
 
 ### Added
 
@@ -108,7 +119,7 @@ No candidate image or stable release has been published yet.
   stopped at npm provenance verification: eventsource-parser@3.1.0
   reported an invalid attestation. The security gate remains enabled;
   the shared workflow requires a successful revalidation before integration
-  or publication. The failure is not evidence by itself of package tampering.
+  or publication at that stage. The failure is not evidence by itself of package tampering.
 - Subsequent [run 45765449908](https://github.com/ridgarou/alexa-mcp/actions/runs/45765449908)
   passed shared CI on 2026-11-26: 157 registry signatures, 18 attestations,
   18 unit tests and both MCP checks passed. Trivy reported 52 high, zero
@@ -139,4 +150,5 @@ The original MIT license and attribution are retained.
   corresponding tag or release. Keep an empty Unreleased section at the top.
 - Do not record credentials, private host configuration or personal data.
 
-[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/a369d5f86858d8d43d4a982bedc5bffdaacccf0c...feature/security-hardening
+[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/360ad516ead85826e1ef3a735c56364f213b7859...develop
+[0.7.0-hardened.1-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771
