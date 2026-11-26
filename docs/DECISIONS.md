@@ -211,6 +211,39 @@ restrictions and the restricted gateway must be reviewed before granting
 an untrusted agent live account access. Any schedule is a future proposal,
 not an active task or deployed service.
 
+## ADR-010 — Bound live device-state requests and report errors explicitly
+
+**Date:** 2026-11-26 · **Status:** Accepted; implementation in RC.2 source,
+live verification pending.
+
+RC.1 live acceptance passed basic checks for 14 of 15 read tools. The
+state endpoint returned a JSON message matching throttling patterns,
+which the MCP handler incorrectly reported as success. The HTTP status
+was not captured. The API remains unofficial; no guarantee of a
+successful state response is possible.
+
+For state queries, require nonempty deviceStates and an empty errors array,
+otherwise return a sanitized MCP error with a stable code. Treat partial
+results as errors rather than silently implying complete success. Keep
+valid response shape unchanged. Use a 25-second application response
+deadline after authentication, explicit 15-second upstream timeout and
+60-second process-local cooldown on throttling or timeout. Permit one
+outstanding state query per MCP process; retain the slot until the callback
+settles, even after the deadline. Do not add retries or reset processes to
+evade Amazon's limits. Other read tools are not gated by this state-query
+guard. A never-settling callback can leave state queries blocked for the
+session; close it normally after use. No cross-process rate limiter or
+upstream cancellation is implemented.
+
+**Rationale:** distinguish unavailable state from successful inventory,
+avoid amplifying throttling, and bound waiting without exposing upstream
+messages or weakening existing authentication/security controls.
+
+**Acceptance:** synthetic regression checks; then a limited real query
+after a normal quiet interval, confirming either valid state or an
+explicit error within the response deadline. Record actual successful
+state retrieval separately. No retries to bypass a rate limit.
+
 ## How to update this record
 
 Use the next ADR number. Include date, status, context, decision, rationale,
