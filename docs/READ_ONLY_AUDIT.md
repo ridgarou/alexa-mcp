@@ -25,7 +25,7 @@ This is a static review, not an Amazon network trace or proof of server-side beh
 No device control, routine execution, deletion or update is called directly
 by these handlers. POST alone does not indicate a write: GraphQL and state
 queries use POST. The list ID is constrained and encoded before interpolation
-in an upstream URL. Live state queries are bounded to 100 identifiers.
+in an upstream URL. Live state queries are bounded to 100 identifiers. RC.2 adds a process-local single-flight guard, a 25-second response deadline after authentication, a 15-second upstream request timeout and a 60-second cooldown after throttling or timeout. The upstream request is not cancelled by the deadline. Error responses are sanitized and returned with MCP isError; partial state results fail closed. No extra application retries are added.
 
 The server's default read-only setting gates registration of write tools;
 it is not an Amazon read-only credential. Initial authentication and token
