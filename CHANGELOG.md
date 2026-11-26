@@ -7,6 +7,18 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+### Added
+
+- Repository-wide [AGENTS.md](AGENTS.md) instructions and an [architecture decision log](docs/DECISIONS.md) to preserve maintainer requirements, security boundaries, independent versioning, cost constraints and release acceptance criteria across contributors and agents.
+
+### Changed
+
+- Adopt independent Semantic Versioning, starting at `1.0.0-rc.1`; the upstream 0.7.0 baseline remains historical attribution.
+- Use package.json as the application version source and verify the lockfile, MCP handshake and OCI image metadata agree.
+- Publish simple version tags without the hardened suffix; reject an already published tag. Deploy by digest as before.
+- Update project metadata to point to the fork and mark the npm package private to prevent accidental npm publication.
+- Preserve the previously published candidate and its digest; the new candidate requires a new validated build.
+
 ## [0.7.0-hardened.1-rc.1] - 2026-11-26
 
 Initial hardened container candidate, published to GHCR. This is not a

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
@@ -22,6 +23,8 @@ const transport = new StdioClientTransport({
 });
 try {
   await client.connect(transport);
+  const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+  assert.equal(client.getServerVersion()?.version, manifest.version, "MCP version must match package.json");
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map(t => t.name).sort(), expected);
   for (const tool of tools) assert.equal(tool.inputSchema.type, "object");
