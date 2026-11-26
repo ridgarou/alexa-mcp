@@ -1,10 +1,15 @@
 name: Hardened candidate validation
 on:
+  push:
+    branches: [main, develop]
   pull_request:
-    branches: [develop]
+    branches: [main, develop]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: hardened-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -46,3 +51,31 @@ jobs:
           name: candidate-trivy-report
           path: /tmp/trivy-report.json
           if-no-files-found: error
+          retention-days: 7
+      - name: Review vulnerability report
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from collections import Counter
+          with open("/tmp/trivy-report.json") as f:
+              report = json.load(f)
+          results = report.get("Results") or []
+          if not results or not any(r.get("Class") == "os-pkgs" for r in results):
+              raise SystemExit("Missing OS vulnerability analysis")
+          findings = [v for r in results for v in (r.get("Vulnerabilities") or [])]
+          counts = Counter(v.get("Severity") for v in findings)
+          critical = [v for v in findings if v.get("Severity") == "CRITICAL"]
+          fixable = [v for v in findings if v.get("FixedVersion")]
+          lines = ["## Runtime vulnerability scan",
+                   f"High: {counts['HIGH']}; Critical: {counts['CRITICAL']}; Fixable: {len(fixable)}",
+                   f"Unique advisory IDs: {len({v.get('VulnerabilityID') for v in findings})}",
+                   "", "| Severity | Advisory | Package | Fix |",
+                   "|---|---|---|---|"]
+          for v in findings:
+              lines.append("| " + " | ".join(str(v.get(k) or "-") for k in ("Severity", "VulnerabilityID", "PkgName", "FixedVersion")) + " |")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("\n".join(lines) + "\n")
+          print("\n".join(lines[:4]))
+          if critical or fixable:
+              raise SystemExit("Critical or fixable high-severity findings require review")
+          PY
