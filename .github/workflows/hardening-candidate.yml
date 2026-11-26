@@ -25,15 +25,31 @@ jobs:
             package.json
             package-lock.json
           if-no-files-found: error
+      # Temporary transfer of public dependency manifests for review by the maintainer.
+      - name: Export manifest checksums and contents
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib
+          for name in ("package.json", "package-lock.json"):
+              data = open(name, "rb").read()
+              print("MANIFEST_SHA256 " + name + " " + hashlib.sha256(data).hexdigest())
+              encoded = base64.b64encode(data).decode("ascii")
+              for i in range(0, len(encoded), 2048):
+                  print("MANIFEST_CHUNK " + name + " " + str(i // 2048) + " " + encoded[i:i+2048])
+          PY
       - run: npm ci --ignore-scripts
       - run: npm audit --include=dev --audit-level=low
       - run: npm audit signatures
       - run: npm test
       - run: timeout 60s node tests/security/mcp-readonly.mjs
+      - name: Check packaged proxy patch
+        run: |
+          cd node_modules/alexa-cookie2
+          patch --dry-run --batch --forward --fuzz=0 -p1 < ../../patches/alexa-cookie-proxy.patch || { sed -n '415,445p' lib/proxy.js; exit 1; }
       - run: docker build --pull -t local/alexa-mcp:hardened-candidate .
       - name: Test runtime offline
         run: |
-          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true -i local/alexa-mcp:hardened-candidate node --input-type=module < tests/security/mcp-readonly.mjs
+          timeout 90s docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true -i local/alexa-mcp:hardened-candidate node --input-type=module < tests/security/mcp-readonly.mjs
           docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges:true local/alexa-mcp:hardened-candidate sh -ec 'test "$(id -u)" = 1000; test ! -w /app/dist/index.js; test ! -w /app/node_modules; test -w /app/.auth; for cmd in npm npx yarn yarnpkg corepack; do if command -v "$cmd"; then exit 1; fi; done'
       - name: Check Compose configuration
         run: |
