@@ -182,8 +182,9 @@ New builds require a new scan.
 
 **Date:** 2026-11-26 · **Status:** Accepted plan; not all tasks implemented.
 
-1. Complete independent versioning validation and promotion.
-2. Manually publish 1.0.0-rc.1 and record its exact digest and results.
+1. Independent versioning validation and promotion completed (PR #6).
+2. Manual publication of 1.0.0-rc.1 completed; see [GHCR.md](GHCR.md)
+   and [CHANGELOG.md](../CHANGELOG.md) for source, digest and results.
 3. Verify anonymous pull and image metadata on the host without changing
    the working installation. Prepare independent candidate configuration,
    preserve rollback and test using the valid existing session safely.
