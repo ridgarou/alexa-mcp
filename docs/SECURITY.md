@@ -74,7 +74,9 @@ auth logs. The normal server must not intentionally expose login ports.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
 - Verify real Amazon access and token refresh on the host only.
-- Manual GHCR candidate publication passed for 1.0.0-rc.1; see [GHCR.md](GHCR.md).
+- Manual GHCR candidate publication passed for 1.0.0-rc.2; see [GHCR.md](GHCR.md).
+  RC.1 stored-session reuse and 14/15 basic live read checks passed. RC.2
+  regression and device-state error-handling verification remain pending.
   Verify anonymous access and deploy only by a reviewed digest, using an
   independent candidate configuration for live integration checks.
 - Do not give agents a Docker socket or access to credential files.

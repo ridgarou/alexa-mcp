@@ -14,8 +14,8 @@ tools remain available in the source but are not exposed by the supplied
 Docker configuration.
 
 > **Versioning:** this fork follows independent [Semantic Versioning](https://semver.org/),
-> starting at `1.0.0-rc.1`, now published to GHCR. The previous
-> `0.7.0-hardened.1-rc.1` image remains available under its historical name.
+> starting at `1.0.0-rc.1`. The current published candidate is `1.0.0-rc.2`.
+> Previous images remain available under their original names.
 > This is not a stable release. The maintainer confirmed public package visibility; anonymous pulls must
 > still be verified before use; live Amazon authentication, refresh and host-specific
 > network controls still require validation. Do not replace a working production
@@ -69,7 +69,7 @@ the source commit used to publish the current candidate:
 ```bash
 git clone https://github.com/ridgarou/alexa-mcp.git
 cd alexa-mcp
-git checkout --detach 3906b98bca312c719d4e3668f72623604cd83414
+git checkout --detach c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9
 cp .env.example .env
 docker compose version
 ```
@@ -136,16 +136,16 @@ an always-running background container.
 
 ### Using GHCR instead of a local build
 
-Version `1.0.0-rc.1` was published on 2026-11-26 in
-[workflow run 45770005405](https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405).
+Version `1.0.0-rc.2` was published on 2026-11-26 in
+[workflow run 45788085719](https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719).
 The public package was previously confirmed by the maintainer; verify anonymous
 access before deployment. Use this immutable image reference:
 
 ```dotenv
-ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d
+ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810
 ```
 
-Use the corresponding Compose files from source commit 3906b98.
+Use the corresponding Compose files from source commit c61c23a.
 Public packages can be pulled without a PAT after their public visibility
 has been verified. If the pull returns an authorization error, check
 package visibility rather than embedding credentials in Compose.
@@ -499,7 +499,7 @@ settings unchanged for normal operation.
 
 ## Known limitations
 
-- In the RC.2 source, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. The published RC.1 does not contain this fix; consult the changelog for publication status. The inventory tools do not require live state queries.
+- In the published RC.2 image, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live verification is still pending. The inventory tools do not require live state queries.
 
 - **Unofficial API** — can break whenever Amazon changes it.
 - **Routine deletion endpoint is unverified.** `alexa_delete_routine` attempts

@@ -40,6 +40,8 @@ the change and its implications in the decision log.
 - Group related changes into one coherent commit or PR to avoid redundant CI.
 - Check the exact PR head SHA, mergeability, base branch and successful CI
   before merging; preserve unrelated changes. Merge only within authorized scope.
+  After promotion verify the actual merge commit has both expected parents
+  and the reviewed tree. Never assume the requested merge method was honored.
 - No auto-merge, automatic release publication or automatic host deployment.
 - Update CHANGELOG.md under Unreleased for notable changes. Update README
   and relevant technical documentation when behavior or configuration changes.

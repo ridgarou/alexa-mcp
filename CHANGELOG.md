@@ -7,11 +7,24 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-11-26
+
+Second release candidate, published to GHCR after the device-state correction.
+
+- Source commit: [c61c23a](https://github.com/ridgarou/alexa-mcp/commit/c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9).
+- Publication: [workflow run 45788085719](https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719).
+- Container tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.2`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810`.
+- Publication passed 28 unit tests, both 15-tool offline MCP checks, npm audit (zero vulnerabilities), 157 registry signatures and 18 attestations.
+- Trivy reported 52 high findings without available fixes (13 distinct advisories), zero critical and zero fixable findings.
+- Registry push and authenticated manifest inspection passed. RC.2 anonymous pull, live regression checks, successful device-state retrieval and credential renewal remain pending.
+- PR #10 required ancestry reconciliation because earlier merge results had a single parent despite a conventional merge being requested. The reconciled commit retained the exact reviewed tree; PR #10 passed CI and its final merge has both expected parents.
+
 ### Fixed
 
 - Live device-state queries no longer treat rate-limit messages, malformed responses, empty states or endpoint errors as successful MCP calls. Return sanitized, machine-readable error codes without upstream error payloads.
 - Bound device-state response waiting after initialization to 25 seconds, pass a 15-second upstream request timeout, enforce one outstanding state request per MCP process, and apply a 60-second cooldown on throttling or timeout. No additional retry is introduced; upstream internal retries may still run after the response deadline.
-- Prepare 1.0.0-rc.2 for a fresh validated build. RC.1 remains the published candidate until RC.2 publication succeeds. Live acceptance found 14/15 tools passed basic checks; the state query returned a throttling message as success. No account-specific data is recorded.
+- RC.1 live acceptance found 14/15 tools passed basic checks; the state query returned a throttling message as success. RC.2 was built and validated separately; RC.1 remains available for rollback. No account-specific data is recorded.
 
 ### Added
 
@@ -185,6 +198,7 @@ The original MIT license and attribution are retained.
   corresponding tag or release. Keep an empty Unreleased section at the top.
 - Do not record credentials, private host configuration or personal data.
 
-[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/3906b98bca312c719d4e3668f72623604cd83414...develop
+[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9...develop
+[1.0.0-rc.2]: https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719
 [1.0.0-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405
 [0.7.0-hardened.1-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771
