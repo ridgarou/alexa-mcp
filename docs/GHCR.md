@@ -2,14 +2,23 @@
 
 ## Published candidates
 
-### 1.0.0-rc.1 (current candidate)
+### 1.0.0-rc.2 (current candidate)
+
+- Published 2026-11-26, source commit `c61c23a`.
+- [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719).
+- Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.2`.
+- Image: `ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810`.
+- All offline validation and the registry push passed, including authenticated manifest inspection.
+- Anonymous pull and live host acceptance of RC.2 remain pending.
+
+### 1.0.0-rc.1 (previous candidate)
 
 - Published 2026-11-26, source commit `3906b98`.
 - [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405).
 - Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.1`.
 - Image: `ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d`.
 - All validation and the registry push passed, including authenticated manifest inspection.
-- Anonymous pull and live host acceptance remain pending.
+- Image inspection and host offline tests passed. Stored-session reuse and 14/15 read tools passed basic live checks; device-state throttling led to RC.2. Anonymous pull was not independently confirmed; real renewal remains pending.
 
 ### Historical candidate
 
@@ -36,7 +45,7 @@ There is no push, PR, schedule, release or tag trigger for publication.
 ## Publish once, manually
 
 On GitHub, open Actions > Publish validated candidate (manual) > Run workflow.
-Select main, enter the exact package version (for example 1.0.0-rc.1),
+Select main, enter the exact package version (for example 1.0.0-rc.2),
 and explicitly enable confirm_publish. This workflow cannot publish from
 a feature branch or a pull request.
 
@@ -48,7 +57,7 @@ Only the publishing job receives packages:write and the temporary GitHub token
 is passed to docker login over stdin only at the final step. No deployment occurs.
 
 New tags use the exact independent SemVer candidate version (for example
-1.0.0-rc.1). The workflow rejects an existing tag and checks the version
+1.0.0-rc.2). The workflow rejects an existing tag and checks the version
 against package.json. No latest tag is created. The workflow summary shows
 the immutable registry digest. Use the next RC number for a new build.
 Stable promotion is a separate, deliberately controlled operation after

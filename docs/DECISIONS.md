@@ -38,7 +38,11 @@ rather than violating the consistency rule.
 
 Use feature/fix/docs branches from develop, PRs into develop (squash),
 then reviewed promotion to main (merge preserving ancestry). Check the
-exact head and successful CI. No automatic merge or direct unreviewed
+exact head and successful CI. After each promotion verify the resulting
+commit has both expected parents and the reviewed tree. If a previous
+merge lost ancestry, reconcile only after verifying both trees and use
+a non-force update; do not rewrite history. PR #10 restored ancestry and
+its final merge had both expected parents. No automatic merge or direct unreviewed
 promotion. Group related changes to limit redundant CI. Maintain an English
 README, CHANGELOG (Keep a Changelog with Unreleased), and technical docs.
 Add or supersede decisions here when changing a project-wide rule.
@@ -183,8 +187,10 @@ New builds require a new scan.
 **Date:** 2026-11-26 · **Status:** Accepted plan; not all tasks implemented.
 
 1. Independent versioning validation and promotion completed (PR #6).
-2. Manual publication of 1.0.0-rc.1 completed; see [GHCR.md](GHCR.md)
-   and [CHANGELOG.md](../CHANGELOG.md) for source, digest and results.
+2. Manual publication of 1.0.0-rc.1 and 1.0.0-rc.2 completed; see
+   [GHCR.md](GHCR.md) and [CHANGELOG.md](../CHANGELOG.md) for evidence.
+   RC.1 passed 14/15 basic live checks and exposed a device-state error
+   handling defect. RC.2 fixes it; live regression and renewal are pending.
 3. Verify anonymous pull and image metadata on the host without changing
    the working installation. Prepare independent candidate configuration,
    preserve rollback and test using the valid existing session safely.
@@ -213,7 +219,7 @@ not an active task or deployed service.
 
 ## ADR-010 — Bound live device-state requests and report errors explicitly
 
-**Date:** 2026-11-26 · **Status:** Accepted; implementation in RC.2 source,
+**Date:** 2026-11-26 · **Status:** Accepted; implementation published in RC.2,
 live verification pending.
 
 RC.1 live acceptance passed basic checks for 14 of 15 read tools. The
