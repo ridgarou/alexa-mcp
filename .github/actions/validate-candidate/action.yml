@@ -1,0 +1,84 @@
+name: Validate hardened candidate
+description: Audit dependencies, build once, test the runtime and gate vulnerabilities.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: '22'
+    - run: npm ci --ignore-scripts
+      shell: bash
+    - run: npm audit --include=dev --audit-level=low
+      shell: bash
+    - run: git diff --exit-code -- package.json package-lock.json
+      shell: bash
+    - run: npm audit signatures
+      shell: bash
+    - run: npm test
+      shell: bash
+    - run: timeout 60s node tests/security/mcp-readonly.mjs
+      shell: bash
+    - name: Check packaged proxy patch
+      shell: bash
+      run: |
+        cd node_modules/alexa-cookie2
+        patch --dry-run --batch --forward --fuzz=0 -p1 < ../../patches/alexa-cookie-proxy.patch || { sed -n '415,445p' lib/proxy.js; exit 1; }
+    - name: Build candidate image (amd64)
+      shell: bash
+      run: |
+        docker build --pull --platform linux/amd64 \
+          --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+          --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+          --label "org.opencontainers.image.licenses=MIT" \
+          -t local/alexa-mcp:hardened-candidate .
+    - name: Test runtime offline
+      shell: bash
+      run: |
+        timeout 90s docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true -i local/alexa-mcp:hardened-candidate node --input-type=module < tests/security/mcp-readonly.mjs
+        docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges:true local/alexa-mcp:hardened-candidate sh -ec 'test "$(id -u)" = 1000; test ! -w /app/dist/index.js; test ! -w /app/node_modules; test -w /app/.auth; for cmd in npm npx yarn yarnpkg corepack; do if command -v "$cmd"; then exit 1; fi; done'
+    - name: Check Compose configuration
+      shell: bash
+      run: |
+        docker compose -f compose.yml config --format json > /tmp/compose.json
+        docker compose -f compose.yml -f compose.auth.yml config --format json > /tmp/compose-auth.json
+        python3 -c 'import json; a=json.load(open("/tmp/compose.json"))["services"]["AlexaMCP"]; b=json.load(open("/tmp/compose-auth.json"))["services"]["AlexaMCP"]; assert not a.get("ports"); assert b["ports"][0]["host_ip"]=="127.0.0.1"; assert a["read_only"]'
+    - name: Scan runtime image
+      shell: bash
+      run: |
+        docker save -o /tmp/alexa-image.tar local/alexa-mcp:hardened-candidate
+        chmod 0644 /tmp/alexa-image.tar
+        docker run --rm --cap-drop ALL --security-opt no-new-privileges:true -v /tmp/alexa-image.tar:/scan/image.tar:ro aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --format json --timeout 10m > /tmp/trivy-report.json
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: candidate-trivy-report
+        path: /tmp/trivy-report.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Review vulnerability report
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        import json, os
+        from collections import Counter
+        with open("/tmp/trivy-report.json") as f:
+            report = json.load(f)
+        results = report.get("Results") or []
+        if not results or not any(r.get("Class") == "os-pkgs" for r in results):
+            raise SystemExit("Missing OS vulnerability analysis")
+        findings = [v for r in results for v in (r.get("Vulnerabilities") or [])]
+        counts = Counter(v.get("Severity") for v in findings)
+        critical = [v for v in findings if v.get("Severity") == "CRITICAL"]
+        fixable = [v for v in findings if v.get("FixedVersion")]
+        lines = ["## Runtime vulnerability scan",
+                 f"High: {counts['HIGH']}; Critical: {counts['CRITICAL']}; Fixable: {len(fixable)}",
+                 f"Unique advisory IDs: {len({v.get('VulnerabilityID') for v in findings})}",
+                 "", "| Severity | Advisory | Package | Fix |",
+                 "|---|---|---|---|"]
+        for v in findings:
+            lines.append("| " + " | ".join(str(v.get(k) or "-") for k in ("Severity", "VulnerabilityID", "PkgName", "FixedVersion")) + " |")
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+            f.write("\n".join(lines) + "\n")
+        print("\n".join(lines[:4]))
+        if critical or fixable:
+            raise SystemExit("Critical or fixable high-severity findings require review")
+        PY

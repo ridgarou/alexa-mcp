@@ -1,0 +1,7 @@
+# Use only with: docker compose -f compose.yml -f compose.auth.yml run --service-ports ...
+services:
+  AlexaMCP:
+    environment:
+      ALEXA_MCP_PROXY_BIND: "0.0.0.0"
+    ports:
+      - "127.0.0.1:3456:3456"

@@ -5,29 +5,17 @@
  * successful login a smoke test (device list) runs and the token is stored in
  * .auth/alexa.json.
  */
-import { networkInterfaces } from "node:os";
 import { defaultConfig, initAlexa } from "./alexa.js";
 import { AUTH_PATH, hasAuth } from "./store.js";
 
-function allLanIps(): string[] {
-  const out: string[] = [];
-  for (const addrs of Object.values(networkInterfaces())) {
-    for (const a of addrs ?? []) {
-      if (a.family === "IPv4" && !a.internal) out.push(a.address);
-    }
-  }
-  return out;
-}
-
 async function main() {
   const cfg = defaultConfig();
-  cfg.logger = (msg: string) => console.error(`  ... ${msg}`);
+  cfg.logger = () => {};
 
   // The URL we print MUST use proxyOwnIp — alexa-cookie2 builds its redirect
   // URLs with it, and proxyOwnIp must byte-match the browser URL. Default
   // 127.0.0.1 = log in on THIS machine.
   const displayIp = cfg.proxyOwnIp;
-  const lanIps = allLanIps();
 
   const alreadyAuthed = hasAuth();
 
@@ -46,14 +34,8 @@ async function main() {
     console.error(`       http://${displayIp}:${cfg.proxyPort}/`);
     console.error("");
     console.error(" 2. Sign in with your Amazon account (including 2FA).");
-    console.error(" 3. Your credentials go only to Amazon; the proxy only captures");
-    console.error("    the session cookie + refreshToken afterwards.");
-    if (displayIp === "127.0.0.1" && lanIps.length) {
-      console.error("");
-      console.error(" Logging in from ANOTHER device? proxyOwnIp must match the browser");
-      console.error(" URL — start it like this instead:");
-      console.error(`   ALEXA_MCP_PROXY_IP=${lanIps[0]} npm run auth`);
-    }
+    console.error(" 3. The local proxy handles sensitive login traffic. Keep it private.");
+    console.error(" For remote Docker hosts use an SSH tunnel, not a LAN-exposed proxy.");
     console.error("");
     console.error(" Waiting for login ... (abort with Ctrl+C)");
   }
@@ -73,14 +55,10 @@ async function main() {
   await new Promise<void>((res) => {
     alexa.getDevices((err: any, result: any) => {
       if (err) {
-        console.error("FAILED: smoke test (getDevices):", err.message ?? err);
+        console.error("FAILED: smoke test (getDevices). Details suppressed.");
       } else {
         const devices = result?.devices ?? [];
-        console.error(`OK: smoke test - ${devices.length} devices:`);
-        for (const d of devices.slice(0, 20)) {
-          console.error(`    - ${d.accountName}  [${d.deviceType}]`);
-        }
-        if (devices.length > 20) console.error(`    ... and ${devices.length - 20} more`);
+        console.error(`OK: smoke test - ${devices.length} devices`);
       }
       res();
     });
@@ -91,7 +69,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("Error:", err?.message ?? err);
+main().catch(() => {
+  console.error("ERROR: Authentication failed. Details suppressed.");
   process.exit(1);
 });

@@ -1,42 +1,67 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  closeSync, constants, fstatSync, fsyncSync, mkdirSync, mkdtempSync,
+  openSync, readFileSync, renameSync, rmSync, writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 /**
- * Persistence of the alexa-remote2 registration/cookie data.
- *
- * We store the complete `alexa.cookieData` object (refreshToken, macDms,
- * deviceSerial, csrf, localCookie, …) verbatim as JSON. Deliberately
- * field-agnostic: alexa-remote2 can read the object back 1:1 as
- * `formerRegistrationData`, no matter how its inner fields change across
- * library versions.
- *
- * The file lives under .auth/ and is git-ignored (it contains a long-lived
- * token — treat it like a password).
+ * Store registration data verbatim; it contains long-lived credentials.
+ * The deployment must keep the directory private and prevent concurrent
+ * authentication sessions. Atomic replacement avoids partially written JSON.
  */
-
 export const AUTH_PATH = resolve(process.env.ALEXA_MCP_AUTH_PATH ?? ".auth/alexa.json");
 
 export type CookieData = Record<string, unknown>;
 
+function isCookieData(data: unknown): data is CookieData {
+  return !!data && typeof data === "object" && !Array.isArray(data)
+    && Object.keys(data).length > 0;
+}
+
 export function loadAuth(path: string = AUTH_PATH): CookieData | undefined {
-  if (!existsSync(path)) return undefined;
+  let fd: number | undefined;
   try {
-    const raw = readFileSync(path, "utf8").trim();
-    if (!raw) return undefined;
-    return JSON.parse(raw) as CookieData;
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)
+      | (constants.O_NONBLOCK ?? 0));
+    if (!fstatSync(fd).isFile()) throw new Error("Not a regular file");
+    const data: unknown = JSON.parse(readFileSync(fd, "utf8"));
+    if (!isCookieData(data)) throw new Error("Invalid authentication data");
+    return data;
   } catch (err) {
-    console.error(`[store] Could not read ${path}: ${(err as Error).message}`);
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error("[store] Could not read authentication data. Details suppressed.");
+    }
     return undefined;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
 export function saveAuth(data: CookieData, path: string = AUTH_PATH): void {
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-  writeFileSync(path, JSON.stringify(data, null, 2), { mode: 0o600 });
+  let temporaryDir: string | undefined;
+  let fd: number | undefined;
+  try {
+    if (!isCookieData(data)) throw new Error("Invalid authentication data");
+    const serialized = JSON.stringify(data, null, 2);
+    const dir = dirname(path);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // Same filesystem as the destination: rename is an atomic replacement.
+    temporaryDir = mkdtempSync(join(dir, ".alexa-auth-"));
+    const temporaryFile = join(temporaryDir, "token");
+    fd = openSync(temporaryFile, "wx", 0o600);
+    writeFileSync(fd, serialized, "utf8");
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    renameSync(temporaryFile, path);
+  } catch {
+    throw new Error("Unable to persist Alexa authentication data. Details suppressed.");
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    if (temporaryDir !== undefined) rmSync(temporaryDir, { recursive: true, force: true });
+  }
 }
 
 export function hasAuth(path: string = AUTH_PATH): boolean {
-  const d = loadAuth(path);
-  return !!d && Object.keys(d).length > 0;
+  return loadAuth(path) !== undefined;
 }

@@ -10,7 +10,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import type AlexaRemote from "alexa-remote2";
-import { initAlexa } from "./alexa.js";
+import { initAlexa, NO_AUTH, RELOGIN_REQUIRED } from "./alexa.js";
 import { writeRoutine, setRoutineEnabled, type TriggerSpec } from "./routines.js";
 import { flattenAppliances, collectRoutineTargets } from "./util.js";
 
@@ -332,7 +332,7 @@ server.registerTool(
   {
     title: "Query smart-home device state",
     description: "Live state of smart-home devices/groups by applianceId (or entityId).",
-    inputSchema: { applianceIds: z.array(z.string()).min(1), entityType: z.enum(["APPLIANCE", "GROUP"]).optional() },
+    inputSchema: { applianceIds: z.array(z.string().min(1).max(512)).min(1).max(100), entityType: z.enum(["APPLIANCE", "GROUP"]).optional() },
   },
   async ({ applianceIds, entityType }) => {
     try {
@@ -384,13 +384,13 @@ server.registerTool(
   {
     title: "Get items of a list",
     description: "Items of a list by listId (from alexa_list_lists).",
-    inputSchema: { listId: z.string() },
+    inputSchema: { listId: z.string().min(1).max(512).regex(/^[A-Za-z0-9_.~+=:-]+$/).refine(id => id !== "." && id !== "..", "Invalid list ID") },
   },
   async ({ listId }) => {
     try {
       const alexa = await getAlexa();
       // v1 returns PLAINTEXT item names (`value`); v2's `encryptedItemName` is ciphertext.
-      const res: any = await callRetry((cb) => (alexa as any).getListItems(listId, {}, cb));
+      const res: any = await callRetry((cb) => (alexa as any).getListItems(encodeURIComponent(listId), {}, cb));
       const items = (Array.isArray(res) ? res : Object.values(res ?? {})).filter(
         (v: any) => v && typeof v === "object" && v.id,
       );
@@ -599,7 +599,7 @@ if (ALLOW_WRITE) {
     triggerDays: z.array(z.string()).optional(),
     triggerTimeZone: z.string().optional(),
     actions: z
-      .array(z.object({ type: z.string(), operationPayload: z.record(z.any()) }))
+      .array(z.object({ type: z.string(), operationPayload: z.record(z.string(), z.any()) }))
       .min(1),
     status: z.enum(["ENABLED", "DISABLED"]).optional(),
     dryRun: z.boolean().optional(),
@@ -1053,11 +1053,11 @@ if (ALLOW_WRITE) {
 }
 
 function hint(e: any): string {
-  const msg = e?.message ?? String(e);
-  if (/\.auth\/alexa\.json|No Alexa auth|re-login needed/.test(msg)) {
-    return `${msg}\n-> Log in once: run \`npm run auth\` in the alexa-mcp directory.`;
+  // Do not pass raw dependency errors to MCP clients: they may contain account data.
+  if (e?.message === NO_AUTH || e?.message === RELOGIN_REQUIRED) {
+    return e.message;
   }
-  return msg;
+  return "Alexa request failed. Details suppressed.";
 }
 
 const transport = new StdioServerTransport();

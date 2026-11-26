@@ -1,0 +1,64 @@
+name: Publish validated candidate (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Candidate version (e.g. 0.7.0-hardened.1-rc.1)"
+        required: true
+        default: "0.7.0-hardened.1-rc.1"
+        type: string
+      confirm_publish:
+        description: "I explicitly approve publishing this candidate to GHCR"
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: ghcr-candidate-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'ridgarou/alexa-mcp' && github.ref == 'refs/heads/main' && inputs.confirm_publish == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Validate candidate version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-hardened\.[0-9]+-rc\.[0-9]+$ ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/validate-candidate
+      - name: Publish the exact tested image
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG="${VERSION}-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          docker tag local/alexa-mcp:hardened-candidate "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG" | tee /tmp/ghcr-push.log
+          DIGEST="$(sed -nE 's/.*digest: (sha256:[a-f0-9]{64}).*/\1/p' /tmp/ghcr-push.log | tail -n 1)"
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker buildx imagetools inspect "$IMAGE@$DIGEST"
+          {
+            echo '## Published candidate (not production)'
+            echo
+            echo "Tag: $IMAGE:$TAG"
+            echo
+            echo "Digest: $IMAGE@$DIGEST"
+            echo
+            echo 'Check package visibility and pull by digest. No deployment was performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
