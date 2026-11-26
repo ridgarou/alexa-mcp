@@ -21,7 +21,7 @@ function allLanIps(): string[] {
 
 async function main() {
   const cfg = defaultConfig();
-  cfg.logger = (msg: string) => console.error(`  ... ${msg}`);
+  cfg.logger = () => {};
 
   // The URL we print MUST use proxyOwnIp — alexa-cookie2 builds its redirect
   // URLs with it, and proxyOwnIp must byte-match the browser URL. Default
@@ -73,7 +73,7 @@ async function main() {
   await new Promise<void>((res) => {
     alexa.getDevices((err: any, result: any) => {
       if (err) {
-        console.error("FAILED: smoke test (getDevices):", err.message ?? err);
+        console.error("FAILED: smoke test (getDevices). Details suppressed.");
       } else {
         const devices = result?.devices ?? [];
         console.error(`OK: smoke test - ${devices.length} devices:`);
@@ -92,6 +92,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Error:", err?.message ?? err);
+  console.error("ERROR: Authentication failed. Details suppressed.");
   process.exit(1);
 });
