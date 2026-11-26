@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Candidate version (e.g. 0.7.0-hardened.1-rc.1)"
+        description: "Candidate version (e.g. 1.0.0-rc.1)"
         required: true
-        default: "0.7.0-hardened.1-rc.1"
+        default: "1.0.0-rc.1"
         type: string
       confirm_publish:
         description: "I explicitly approve publishing this candidate to GHCR"
@@ -32,10 +32,16 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-hardened\.[0-9]+-rc\.[0-9]+$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Match requested version to source
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(node -p 'require("./package.json").version')" = "$VERSION"
       - uses: ./.github/actions/validate-candidate
       - name: Publish the exact tested image
         shell: bash
@@ -45,9 +51,27 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
-          TAG="${VERSION}-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          TAG="$VERSION"
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          # Fail closed if the version already exists, or registry status is ambiguous.
+          # A public package permits the authenticated registry manifest lookup below.
+          python3 - <<'PY'
+          import os, json, urllib.request, urllib.error, base64
+          repo = os.environ["GITHUB_REPOSITORY"].lower()
+          version = os.environ["VERSION"]
+          basic = base64.b64encode((os.environ["GITHUB_ACTOR"] + ":" + os.environ["GHCR_TOKEN"]).encode()).decode()
+          token_req = urllib.request.Request("https://ghcr.io/token?service=ghcr.io&scope=repository:" + repo + ":pull", headers={"Authorization": "Basic " + basic})
+          with urllib.request.urlopen(token_req, timeout=30) as response:
+              token = json.load(response)["token"]
+          req = urllib.request.Request("https://ghcr.io/v2/" + repo + "/manifests/" + version, headers={"Authorization": "Bearer " + token, "Accept": "application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json"}, method="HEAD")
+          try:
+              with urllib.request.urlopen(req, timeout=30):
+                  raise SystemExit("Version already published; choose a new version.")
+          except urllib.error.HTTPError as err:
+              if err.code != 404:
+                  raise SystemExit("Unable to establish that version is unused; publication blocked.")
+          PY
           docker tag local/alexa-mcp:hardened-candidate "$IMAGE:$TAG"
           docker push "$IMAGE:$TAG" | tee /tmp/ghcr-push.log
           DIGEST="$(sed -nE 's/.*digest: (sha256:[a-f0-9]{64}).*/\1/p' /tmp/ghcr-push.log | tail -n 1)"

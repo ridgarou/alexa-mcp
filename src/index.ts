@@ -9,6 +9,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { readFileSync } from "node:fs";
 import type AlexaRemote from "alexa-remote2";
 import { initAlexa, NO_AUTH, RELOGIN_REQUIRED } from "./alexa.js";
 import { writeRoutine, setRoutineEnabled, type TriggerSpec } from "./routines.js";
@@ -56,7 +57,8 @@ function fail(msg: string) {
   return { isError: true, content: [{ type: "text" as const, text: msg }] };
 }
 
-const server = new McpServer({ name: "alexa-mcp", version: "0.1.0" });
+const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+const server = new McpServer({ name: "alexa-mcp", version });
 
 // -- Read tools -------------------------------------------------------------
 server.registerTool(

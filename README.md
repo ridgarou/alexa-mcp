@@ -13,9 +13,11 @@ Compose configuration is read-only at the MCP tool level. Upstream write
 tools remain available in the source but are not exposed by the supplied
 Docker configuration.
 
-> **Candidate status:** `0.7.0-hardened.1-rc.1` has been published to GHCR.
-> This is not a stable release. Registry visibility and anonymous pulls must
-> be verified before use; live Amazon authentication, refresh and host-specific
+> **Versioning:** this fork follows independent [Semantic Versioning](https://semver.org/),
+> starting at `1.0.0-rc.1`. The previous `0.7.0-hardened.1-rc.1` image
+> remains published under its historical name; the new version is not yet published.
+> This is not a stable release. The maintainer confirmed public package visibility; anonymous pulls must
+> still be verified before use; live Amazon authentication, refresh and host-specific
 > network controls still require validation. Do not replace a working production
 > deployment yet. See [CHANGELOG.md](CHANGELOG.md).
 >
@@ -129,7 +131,8 @@ an always-running background container.
 
 The first candidate was published on 2026-11-26 in
 [workflow run 45766872771](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
-After verifying package visibility and access, use its exact registry digest:
+The maintainer confirmed public visibility. This is the historical candidate digest;
+use it only for that version. The new `1.0.0-rc.1` digest will be recorded after publication:
 
 ```dotenv
 ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5

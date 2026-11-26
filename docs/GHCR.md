@@ -6,8 +6,8 @@
 - [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
 - Tag: `0.7.0-hardened.1-rc.1-360ad516ead8-45766872771-1`.
 - Image: `ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5`.
-- Registry push and authenticated inspection passed. Anonymous access and
-  actual package visibility still require confirmation.
+- Registry push and authenticated inspection passed. The maintainer confirmed public package visibility;
+  anonymous access still requires verification.
 
 This workflow distributes a release candidate, not a production-ready image.
 There is no push, PR, schedule, release or tag trigger for publication.
@@ -25,7 +25,7 @@ There is no push, PR, schedule, release or tag trigger for publication.
 ## Publish once, manually
 
 On GitHub, open Actions > Publish validated candidate (manual) > Run workflow.
-Select main, enter a candidate version such as 0.7.0-hardened.1-rc.1,
+Select main, enter the exact package version (for example 1.0.0-rc.1),
 and explicitly enable confirm_publish. This workflow cannot publish from
 a feature branch or a pull request.
 
@@ -36,9 +36,12 @@ prevent publication. The validated local image is then pushed without rebuilding
 Only the publishing job receives packages:write and the temporary GitHub token
 is passed to docker login over stdin only at the final step. No deployment occurs.
 
-The tag includes the candidate version, commit prefix, workflow run ID and
-attempt. No latest tag is created. The workflow summary shows the immutable
-registry digest. Repeated runs create new tags; do not rerun unnecessarily.
+New tags use the exact independent SemVer candidate version (for example
+1.0.0-rc.1). The workflow rejects an existing tag and checks the version
+against package.json. No latest tag is created. The workflow summary shows
+the immutable registry digest. Use the next RC number for a new build.
+Stable promotion is a separate, deliberately controlled operation after
+live testing; the candidate workflow cannot publish stable versions.
 
 ## First publication and visibility
 
