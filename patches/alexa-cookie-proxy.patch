@@ -1,7 +1,6 @@
 --- a/lib/proxy.js
 +++ b/lib/proxy.js
-@@ -422,7 +422,12 @@
-         _options.proxyLogLevel === 'debug' && _options.logger && _options.logger(`Alexa-Cookie: Proxy-Request: (modified:${modified})${customStringify(proxyReq, null, 2)}`);
+@@ -423,6 +423,11 @@ function initAmazonProxy(_options, callbackCookie, callbackListening) {
      }
  
      function onProxyRes(proxyRes, req, res) {
