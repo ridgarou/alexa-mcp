@@ -1,0 +1,42 @@
+name: Hardened candidate validation
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve candidate dependencies
+        run: node scripts/resolve-hardened-dependencies.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-manifests
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+      - run: npm ci --ignore-scripts
+      - run: npm audit --include=dev --audit-level=low
+      - run: npm audit signatures
+      - run: npm test
+      - run: timeout 60s node tests/security/mcp-readonly.mjs
+      - run: docker build --pull -t local/alexa-mcp:hardened-candidate .
+      - name: Test runtime offline
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true -i local/alexa-mcp:hardened-candidate node --input-type=module < tests/security/mcp-readonly.mjs
+          docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges:true local/alexa-mcp:hardened-candidate sh -ec 'test "$(id -u)" = 1000; test ! -w /app/dist/index.js; test ! -w /app/node_modules; test -w /app/.auth; for cmd in npm npx yarn yarnpkg corepack; do if command -v "$cmd"; then exit 1; fi; done'
+      - name: Check Compose configuration
+        run: |
+          docker compose -f compose.yml config --format json > /tmp/compose.json
+          docker compose -f compose.yml -f compose.auth.yml config --format json > /tmp/compose-auth.json
+          python3 -c 'import json; a=json.load(open("/tmp/compose.json"))["services"]["AlexaMCP"]; b=json.load(open("/tmp/compose-auth.json"))["services"]["AlexaMCP"]; assert not a.get("ports"); assert b["ports"][0]["host_ip"]=="127.0.0.1"; assert a["read_only"]'
