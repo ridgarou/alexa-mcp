@@ -35,7 +35,7 @@ capabilities, non-root users, no restart and bounded resources.
 - `squid.conf.template`: CONNECT-only policy, cache and access logs disabled.
 - `policy.py`: generates dedicated host and namespace nftables rules.
 - `run.py`: guarded launch, preflight, cleanup and session lock.
-- `probe.mjs`, `test_policy.py`: live negative probes and synthetic policy tests.
+- `readiness.mjs`, `probe.mjs`, `test_policy.py`: live negative probes and synthetic policy tests.
 - `.env.example`: generic example; keep the actual .env local.
 - [Threat model](THREAT_MODEL.md): trust boundaries and limitations.
 
@@ -104,6 +104,13 @@ not an account login):
 ```sh
 sudo python3 -B /opt/alexa-egress/run.py check --amazon
 ```
+
+If the synthetic check fails during startup, repeat only after reviewing cleanup.
+The optional `check --diagnostics` flag exposes bounded Squid startup diagnostics
+and listener status on failure. It is rejected in real session mode; review
+local network details before sharing output. No access logging is enabled.
+Squid runs attached in the foreground so startup exit status is visible.
+ICMP pinger and persistent network measurements are disabled.
 
 If a check fails, investigate; do not broaden the allowlist or remove a
 guard just to pass. CI does not need Amazon credentials.

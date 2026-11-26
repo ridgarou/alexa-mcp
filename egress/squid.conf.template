@@ -16,6 +16,8 @@ http_access deny all
 dns_nameservers 1.1.1.1 1.0.0.1
 cache deny all
 cache_mem 8 MB
+pinger_enable off
+netdb_filename none
 maximum_object_size_in_memory 0 KB
 access_log none
 cache_log /dev/null

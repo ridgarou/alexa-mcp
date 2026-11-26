@@ -209,7 +209,11 @@ def main():
     parser.add_argument("mode", choices=("run", "check"))
     parser.add_argument("--amazon", action="store_true",
                         help="also test unauthenticated HTTPS to one allowed Amazon host")
+    parser.add_argument("--diagnostics", action="store_true",
+                        help="synthetic check only: show bounded startup diagnostics on failure")
     args = parser.parse_args()
+    if args.diagnostics and args.mode != "check":
+        parser.error("--diagnostics is restricted to synthetic check mode")
     if os.geteuid() != 0:
         raise RuntimeError("Run as root on the trusted Docker host")
     for directory in (ROOT, *ROOT.parents):
@@ -217,7 +221,7 @@ def main():
         if st.st_uid != 0 or st.st_mode & 0o022:
             raise RuntimeError("Launcher directory must be root controlled")
     for name in ("run.py", "policy.py", "compose.yml", "squid.conf.template",
-                 "allowed-domains.txt", "probe.mjs"):
+                 "allowed-domains.txt", "probe.mjs", "readiness.mjs"):
         trusted_file(ROOT / name)
     STATE.mkdir(mode=0o700, exist_ok=True)
     if STATE.is_symlink() or STATE.stat().st_uid != 0 or STATE.stat().st_mode & 0o077:
@@ -261,6 +265,8 @@ def main():
             check_auth(Path(env["ALEXA_MCP_AUTH_DIR"]))
         host_installed = False
         attempted_up = False
+        squid_process = None
+        startup_log = stack.enter_context(tempfile.TemporaryFile(mode="w+b")) if args.diagnostics else None
         try:
             # Parse before creating any resources; no override/autoloaded Compose.
             note("STAGE: validate Compose and install host policy")
@@ -289,18 +295,48 @@ def main():
             note("STAGE: parse and launch Squid")
             squid_cmd = ["/usr/sbin/squid", "-f", "/etc/alexa-egress/squid.conf"]
             cmd(DOCKER + ["exec", proxy, *squid_cmd, "-k", "parse"])
-            cmd(DOCKER + ["exec", "-d", proxy, *squid_cmd, "-N"])
-            # Readiness is an actual client-side denial response, not an open port.
-            for attempt in range(20):
-                try:
-                    cmd(DOCKER + ["exec", app, "node", "-e",
-                        "const s=require('net').connect(3128,process.argv[1],()=>s.write('CONNECT example.invalid:443 HTTP/1.1\\r\\nHost: example.invalid:443\\r\\n\\r\\n'));s.setTimeout(800,()=>process.exit(1));s.once('error',()=>process.exit(1));s.once('data',d=>process.exit(/^HTTP\\/1\\.[01] 403\\b/.test(d.toString())?0:1))",
-                        v["proxy"]], timeout=3)
-                    break
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            # Keep the exec client attached to the foreground Squid process.
+            # Detached exec previously hid startup exit status entirely.
+            squid_process = subprocess.Popen(
+                DOCKER + ["exec", proxy, *squid_cmd, "-N", "-d", "1"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=startup_log if startup_log is not None else subprocess.DEVNULL,
+                env=ENV)
+            readiness = (ROOT / "readiness.mjs").read_text()
+            last = "NOT_TESTED"
+            try:
+                for attempt in range(20):
+                    if squid_process.poll() is not None:
+                        raise RuntimeError("Squid exited before readiness")
+                    try:
+                        result = cmd(DOCKER + ["exec", "-i", app, "node", "--input-type=module", "-", v["proxy"]],
+                                     data=readiness, timeout=4, check=False)
+                        value = result.stdout.strip()
+                        last = value if re.fullmatch(r"(?:HTTP_[1-5][0-9]{2}|SOCKET_[A-Z0-9_]+|TIMEOUT|CLOSED|INVALID)", value) else "PROBE_EXEC_ERROR"
+                        if result.returncode == 0 and last == "HTTP_403":
+                            note("PASS: proxy readiness denied unknown destination")
+                            break
+                        # Any positive or unexpected HTTP response is a policy failure,
+                        # not an invitation to retry or loosen the ACL.
+                        if last.startswith("HTTP_"):
+                            raise RuntimeError("Unexpected readiness response: " + last)
+                    except subprocess.TimeoutExpired:
+                        last = "EXEC_TIMEOUT"
                     time.sleep(0.25)
-            else:
-                raise RuntimeError("Proxy readiness/deny probe failed")
+                else:
+                    raise RuntimeError("Proxy readiness failed: " + last)
+            except RuntimeError:
+                note("READINESS_LAST: " + last)
+                note("SQUID_EXEC_EXIT: " + str(squid_process.poll()))
+                if args.diagnostics:
+                    listeners = cmd(["nsenter", "--target", str(proxy_pid), "--net", "ss", "-H", "-ltn"], check=False)
+                    note("SQUID_LISTENER_3128: " + ("YES" if re.search(r":3128\b", listeners.stdout) else "NO"))
+                    startup_log.seek(0, os.SEEK_END)
+                    startup_log.seek(max(0, startup_log.tell() - 8192))
+                    note("=== SYNTHETIC SQUID STARTUP DIAGNOSTICS ===")
+                    note(startup_log.read(8192).decode("utf-8", errors="replace"))
+                    note("=== END DIAGNOSTICS ===")
+                raise
             note("STAGE: isolation probes")
             probe(app, v, args.amazon)
             if args.mode == "run":
@@ -316,8 +352,20 @@ def main():
             note("GUARDED_SESSION: PASS")
         finally:
             # Keep firewall on any uncertain cleanup; never remove a preexisting table.
-            if attempted_up:
-                stop_project(env)
+            try:
+                if attempted_up:
+                    stop_project(env)
+            finally:
+                if squid_process is not None:
+                    try:
+                        squid_process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        squid_process.terminate()
+                        try:
+                            squid_process.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            squid_process.kill()
+                            squid_process.wait()
             if host_installed:
                 cmd(["nft", "delete", "table", "inet", TABLE])
             import shutil
