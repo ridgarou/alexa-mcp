@@ -1,0 +1,95 @@
+name: Egress isolation validation
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'egress/**'
+      - '.github/workflows/egress-validation.yml'
+      - 'Dockerfile'
+      - 'src/**'
+      - 'package*.json'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'egress/**'
+      - '.github/workflows/egress-validation.yml'
+      - 'Dockerfile'
+      - 'src/**'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: egress-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  guarded-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Static policy tests
+        run: |
+          python3 -m unittest discover -s egress -p 'test_*.py' -v
+          python3 -m py_compile egress/run.py egress/policy.py
+          node --check egress/probe.mjs
+      - name: Build application and proxy
+        run: |
+          docker build --pull --platform linux/amd64 -t local/alexa-mcp:egress-test .
+          docker build --pull --platform linux/amd64 -t local/alexa-egress:test egress
+      - name: Verify isolation on ephemeral Linux runner
+        run: |
+          set -euo pipefail
+          if ! command -v nft >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends nftables
+          fi
+          APP="$(docker image inspect --format '{{.Id}}' local/alexa-mcp:egress-test)"
+          PROXY="$(docker image inspect --format '{{.Id}}' local/alexa-egress:test)"
+          UPLINK="$(ip -j -4 route get 1.1.1.1 | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["dev"])')"
+          sudo install -d -m 0700 /root/alexa-egress-ci
+          sudo cp -a egress/. /root/alexa-egress-ci/
+          sudo chown -R root:root /root/alexa-egress-ci
+          sed -e "s|^ALEXA_MCP_IMAGE=.*|ALEXA_MCP_IMAGE=$APP|" \
+              -e "s|^ALEXA_EGRESS_IMAGE=.*|ALEXA_EGRESS_IMAGE=$PROXY|" \
+              -e "s|^ALEXA_EGRESS_UPLINK=.*|ALEXA_EGRESS_UPLINK=$UPLINK|" \
+              egress/.env.example | sudo tee /root/alexa-egress-ci/.env >/dev/null
+          sudo chmod 600 /root/alexa-egress-ci/.env
+          sudo python3 -B /root/alexa-egress-ci/run.py check
+          test -z "$(docker ps -aq --filter label=com.docker.compose.project=alexa-egress)"
+          test -z "$(docker network ls -q --filter label=com.docker.compose.project=alexa-egress)"
+          if sudo nft list table inet alexa_guard >/dev/null 2>&1; then
+            echo "Guard table unexpectedly remains after successful cleanup"
+            exit 1
+          fi
+      - name: Scan proxy runtime
+        run: |
+          docker save -o /tmp/alexa-egress.tar local/alexa-egress:test
+          chmod 0644 /tmp/alexa-egress.tar
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges:true \
+            -v /tmp/alexa-egress.tar:/scan/image.tar:ro \
+            aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
+            image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL \
+            --format json --timeout 10m > /tmp/egress-trivy.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("/tmp/egress-trivy.json")).get("Results") or []
+          if not any(x.get("Class")=="os-pkgs" for x in r):
+              raise SystemExit("Missing proxy OS scan")
+          findings=[v for x in r for v in x.get("Vulnerabilities") or []]
+          high=sum(v.get("Severity")=="HIGH" for v in findings)
+          critical=sum(v.get("Severity")=="CRITICAL" for v in findings)
+          fixable=sum(bool(v.get("FixedVersion")) for v in findings)
+          print(f"Proxy High: {high}; Critical: {critical}; Fixable: {fixable}")
+          if critical or fixable:
+              raise SystemExit("Proxy security gate failed")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: egress-trivy-report
+          path: /tmp/egress-trivy.json
+          retention-days: 7
+          if-no-files-found: ignore

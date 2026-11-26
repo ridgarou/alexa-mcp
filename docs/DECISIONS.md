@@ -250,6 +250,23 @@ after a normal quiet interval, confirming either valid state or an
 explicit error within the response deadline. Record actual successful
 state retrieval separately. No retries to bypass a rate limit.
 
+## Proposed egress implementation (ADR number assigned after stable promotion)
+
+**Status:** Implementation draft; host and CI acceptance pending.
+
+Use a self-contained egress/ folder and README, separate Compose project
+rather than an override, Squid CONNECT without TLS interception, exact
+Spain allowlist, and root-controlled on-demand launcher. Add temporary
+host nftables table and default-deny network namespace rules before
+starting real processes. This refines the earlier iptables-chain and
+persistent-service design: nft transactions keep our rules separate from
+Docker/Netavark and namespace rules block embedded DNS before DNAT.
+No permanent systemd service is necessary when containers cannot restart
+automatically and each guarded session reapplies policy. Review cleanup,
+fail-closed behavior, DNS, scope and limitations in egress/THREAT_MODEL.md.
+Do not merge into develop or release 1.1.0 until the 1.0.0 release cycle is
+complete and this feature has been rebased/reconciled, reviewed and tested.
+
 ## How to update this record
 
 Use the next ADR number. Include date, status, context, decision, rationale,

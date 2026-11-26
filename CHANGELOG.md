@@ -7,6 +7,10 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+### Added
+
+- Experimental, separately documented Squid egress component for supervised Spain-based inventory, with an independent Compose project, guarded on-demand launcher, host and namespace policy generation and isolation tests. No release or live host acceptance claimed.
+
 ## [1.0.0-rc.2] - 2026-11-26
 
 Second release candidate, published to GHCR after the device-state correction.

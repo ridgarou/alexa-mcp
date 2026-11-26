@@ -212,6 +212,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise RuntimeError("Run as root on the trusted Docker host")
+    for directory in (ROOT, *ROOT.parents):
+        st = directory.stat()
+        if st.st_uid != 0 or st.st_mode & 0o022:
+            raise RuntimeError("Launcher directory must be root controlled")
     for name in ("run.py", "policy.py", "compose.yml", "squid.conf.template",
                  "allowed-domains.txt", "probe.mjs"):
         trusted_file(ROOT / name)
@@ -241,7 +245,7 @@ def main():
         (config / "allowed-domains.txt").write_text("\n".join(domains) + "\n")
         squid = (ROOT / "squid.conf.template").read_text()
         squid = squid.replace("@CLIENT_IP@", v["app"]).replace("@PROXY_IP@", v["proxy"])
-        squid = squid.replace("@BLOCKED_IPV4@", " ".join((*BLOCKED, *extra)))
+        squid = squid.replace("@BLOCKED_IPV4@", " ".join(str(n) for n in ipaddress.collapse_addresses(ipaddress.IPv4Network(x) for x in (*BLOCKED, *extra))))
         if "@" in squid:
             raise RuntimeError("Unresolved Squid configuration")
         (config / "squid.conf").write_text(squid)
@@ -259,11 +263,13 @@ def main():
         attempted_up = False
         try:
             # Parse before creating any resources; no override/autoloaded Compose.
+            note("STAGE: validate Compose and install host policy")
             compose(env, ["config", "--quiet"])
             install_nft(host_policy(v, extra))
             host_installed = True
             attempted_up = True
             compose(env, ["up", "-d", "--no-build", "--pull", "never"], timeout=90)
+            note("STAGE: inspect inert containers and networks")
             validate_runtime_networks(v)
             app = compose(env, ["ps", "-q", "AlexaMCP"]).stdout.strip()
             proxy = compose(env, ["ps", "-q", "AlexaEgress"]).stdout.strip()
@@ -275,10 +281,12 @@ def main():
                               PROJECT + "_outbound": v["ext"]}, image_ids["ALEXA_EGRESS_IMAGE"], True)
             if os.stat(f"/proc/{app_pid}/ns/net").st_ino == os.stat(f"/proc/{proxy_pid}/ns/net").st_ino:
                 raise RuntimeError("Shared network namespace")
+            note("STAGE: install namespace policies")
             for pid, is_proxy in ((app_pid, False), (proxy_pid, True)):
                 install_nft(namespace_policy(v, is_proxy, extra),
                             ["nsenter", "--target", str(pid), "--net"])
             # Parse and start Squid only after all guard rules have been installed.
+            note("STAGE: parse and launch Squid")
             squid_cmd = ["/usr/sbin/squid", "-f", "/etc/alexa-egress/squid.conf"]
             cmd(DOCKER + ["exec", proxy, *squid_cmd, "-k", "parse"])
             cmd(DOCKER + ["exec", "-d", proxy, *squid_cmd, "-N"])
@@ -293,6 +301,7 @@ def main():
                     time.sleep(0.25)
             else:
                 raise RuntimeError("Proxy readiness/deny probe failed")
+            note("STAGE: isolation probes")
             probe(app, v, args.amazon)
             if args.mode == "run":
                 check = cmd(DOCKER + ["exec", app, "node", "-p",

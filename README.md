@@ -497,6 +497,10 @@ settings unchanged for normal operation.
 - Authentication logs are suppressed and the Compose logging driver is
   disabled; no real account data belongs in GitHub Actions or issue reports.
 
+## Optional egress isolation (experimental)
+
+See [egress/README.md](egress/README.md) for the separate guarded Squid component, prerequisites, threat model and acceptance tests. It is not part of the current published RC.2 image or approved for autonomous access.
+
 ## Known limitations
 
 - In the published RC.2 image, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live verification is still pending. The inventory tools do not require live state queries.
