@@ -1,5 +1,14 @@
 # GHCR candidate publication
 
+## Published candidates
+
+- `0.7.0-hardened.1-rc.1` — 2026-11-26, source commit `360ad51`.
+- [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771).
+- Tag: `0.7.0-hardened.1-rc.1-360ad516ead8-45766872771-1`.
+- Image: `ghcr.io/ridgarou/alexa-mcp@sha256:3d2c5a935081324d58a9a63c51622a196a6ec6cdfeb7e7320d222a0cf061f3f5`.
+- Registry push and authenticated inspection passed. Anonymous access and
+  actual package visibility still require confirmation.
+
 This workflow distributes a release candidate, not a production-ready image.
 There is no push, PR, schedule, release or tag trigger for publication.
 
