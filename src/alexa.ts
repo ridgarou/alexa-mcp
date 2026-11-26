@@ -116,6 +116,9 @@ export function initAlexa(
         logger: cfg.logger,
         amazonPage: cfg.amazonPage,
         acceptLanguage: cfg.acceptLanguage,
+        amazonPageProxyLanguage:
+          process.env.ALEXA_MCP_PROXY_LANGUAGE ??
+          cfg.acceptLanguage.replace(/-/g, "_"),
         usePushConnection: cfg.usePushConnection,
         cookieRefreshInterval: cfg.cookieRefreshIntervalMs,
       } as any,
