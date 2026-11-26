@@ -116,7 +116,11 @@ Each isolation probe reports a fixed identifier, PASS/FAIL and a bounded
 status code, including on failure. An explicit proxy denial must be HTTP 403;
 a timeout or arbitrary error is not accepted as proof of that ACL. Direct
 TCP tests distinguish timeout/no-route from connection refusal. DNS tests
-require a timeout; no DNS answers or raw upstream errors are logged.
+combine a raw UDP query, resolver status and independent host evidence.
+The embedded Docker DNS must increment its pre-DNAT drop counter. The
+public resolver must increment its drop counter or be proven unreachable
+by route lookup in the application namespace. A resolver ECONNREFUSED
+alone is not sufficient. No DNS answers or raw upstream errors are logged.
 The entire expected result sequence must pass before starting MCP.
 
 If a check fails, investigate; do not broaden the allowlist or remove a

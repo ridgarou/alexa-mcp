@@ -1,6 +1,7 @@
 import net from "node:net";
 import https from "node:https";
 import dns from "node:dns/promises";
+import dgram from "node:dgram";
 
 const [proxy, gateway, mode] = process.argv.slice(2);
 let failures = 0;
@@ -80,10 +81,33 @@ for (const [id, host, port] of [
 ]) {
   outcome(id, await socketAttempt(host, port), blocked);
 }
+// A real DNS query on a plain UDP socket. c-ares can collapse local
+// routing/firewall errors into ECONNREFUSED; it is not our only evidence.
+function udpDnsAttempt(server) {
+  return new Promise(resolve => {
+    const socket = dgram.createSocket("udp4");
+    const query = Buffer.from("123401000001000000000000076578616d706c6503636f6d0000010001", "hex");
+    let settled = false;
+    const deadline = setTimeout(() => done("UDP_TIMEOUT"), 1200);
+    function done(result) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      try { socket.close(); } catch {}
+      resolve(result);
+    }
+    socket.once("message", () => done("UDP_RESPONSE"));
+    socket.once("error", err => done("UDP_" + safeCode(err)));
+    socket.send(query, 53, server, err => {
+      if (err) done("UDP_" + safeCode(err));
+    });
+  });
+}
 for (const [id, server] of [
   ["DIRECT_DOCKER_DNS_UDP", "127.0.0.11"],
   ["DIRECT_PUBLIC_DNS_UDP", "1.1.1.1"],
 ]) {
+  const raw = await udpDnsAttempt(server);
   const resolver = new dns.Resolver({ timeout: 500, tries: 1 });
   resolver.setServers([server]);
   let actual = "RESOLVED";
@@ -94,7 +118,14 @@ for (const [id, server] of [
   } finally {
     resolver.cancel();
   }
-  outcome(id, actual, "DNS_ETIMEOUT");
+  // These are negative socket observations, not proof by themselves.
+  // The host independently requires a kernel drop counter or no route.
+  const rawBlocked = ["UDP_TIMEOUT", "UDP_EPERM", "UDP_EACCES",
+    "UDP_ENETUNREACH", "UDP_EHOSTUNREACH"].includes(raw);
+  const resolverBlocked = ["DNS_ETIMEOUT", "DNS_ECONNREFUSED",
+    "DNS_ENETUNREACH", "DNS_EHOSTUNREACH", "DNS_EPERM", "DNS_EACCES"].includes(actual);
+  const observed = raw + "_" + actual;
+  outcome(id, observed, rawBlocked && resolverBlocked ? observed : []);
 }
 
 if (mode === "amazon" && failures === 0) {

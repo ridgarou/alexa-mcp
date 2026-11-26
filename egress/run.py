@@ -16,7 +16,8 @@ import tempfile
 import time
 
 from policy import (TABLE, PRIVATE_BR, OUTBOUND_BR, BLOCKED, DNS,
-                    host_policy, namespace_policy, validate_networks, validate_domains)
+                    host_policy, namespace_policy, validate_networks, validate_domains,
+                    dns_denial_evidence)
 
 ROOT = Path(__file__).resolve().parent
 PROJECT = "alexa-egress"
@@ -103,7 +104,9 @@ def collect_networks(v):
         if dst == "default":
             continue
         net = ipaddress.IPv4Network(dst, strict=False)
-        if net.prefixlen == 32 and str(net.network_address) in DNS and route.get("gateway") and route.get("dev") == v["uplink"]:
+        if net.prefixlen == 32 and str(net.network_address) in DNS and route.get("gateway"):
+            # Ignore alternate routed DNS host entries as well; the actual
+            # selected route must still use the configured uplink below.
             continue
         existing.append(net)
     ids = cmd(DOCKER + ["network", "ls", "-q"]).stdout.split()
@@ -190,6 +193,29 @@ def validate_runtime_networks(v):
             or {c.get("Subnet") for c in network["IPAM"]["Config"]} != {subnet}
             or len(network.get("Containers", {})) != (2 if internal else 1)):
             raise RuntimeError("Unexpected runtime network")
+
+def dns_counters(pid):
+    prefix = ["nsenter", "--target", str(pid), "--net"]
+    result = {}
+    for name in ("dns_docker_udp", "dns_public_udp"):
+        data = js([*prefix, "nft", "-j", "list", "counter", "inet", TABLE, name])
+        matches = [item["counter"] for item in data["nftables"]
+                   if "counter" in item and item["counter"].get("name") == name
+                   and item["counter"].get("table") == TABLE
+                   and item["counter"].get("family") == "inet"]
+        if len(matches) != 1 or type(matches[0].get("packets")) is not int:
+            raise RuntimeError("DNS drop counter unavailable")
+        result[name] = matches[0]["packets"]
+    return result
+
+def public_dns_has_no_route(pid):
+    # Independently inspect route selection inside the application namespace.
+    # An unexpected error is not proof of isolation.
+    r = cmd(["nsenter", "--target", str(pid), "--net", "ip", "-j", "-4",
+             "route", "get", DNS[0]], check=False)
+    if r.returncode == 0:
+        return False
+    return r.returncode == 2 and r.stderr.strip() == "RTNETLINK answers: Network is unreachable"
 
 def probe(cid, v, amazon=False):
     source = (ROOT / "probe.mjs").read_text()
@@ -359,7 +385,18 @@ def main():
                     note("=== END DIAGNOSTICS ===")
                 raise
             note("STAGE: isolation probes")
+            before_dns = dns_counters(app_pid)
             probe(app, v, args.amazon)
+            after_dns = dns_counters(app_pid)
+            no_route = public_dns_has_no_route(app_pid)
+            evidence = dns_denial_evidence(before_dns, after_dns, no_route)
+            for name, passed in evidence.items():
+                note(name + (": PASS" if passed else ": FAIL"))
+            note("DNS_DOCKER_DROPS: " + str(after_dns["dns_docker_udp"] - before_dns["dns_docker_udp"]))
+            note("DNS_PUBLIC_DROPS: " + str(after_dns["dns_public_udp"] - before_dns["dns_public_udp"]))
+            note("DNS_PUBLIC_NO_ROUTE: " + ("YES" if no_route else "NO"))
+            if not all(evidence.values()):
+                raise RuntimeError("DNS guard evidence missing")
             if args.mode == "run":
                 check = cmd(DOCKER + ["exec", app, "node", "-p",
                     "process.versions.node"]).stdout.strip()

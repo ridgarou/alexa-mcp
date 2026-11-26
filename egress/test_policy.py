@@ -1,5 +1,5 @@
 import unittest
-from policy import validate_networks, validate_domains, blocked_set, host_policy, namespace_policy
+from policy import validate_networks, validate_domains, blocked_set, host_policy, namespace_policy, dns_denial_evidence
 
 V = dict(private="172.31.240.0/28", outbound="172.31.240.16/28",
          app="172.31.240.2", proxy="172.31.240.3", ext="172.31.240.18",
@@ -28,9 +28,23 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("hook input priority -150; policy drop", app)
         self.assertIn("hook forward priority -150; policy drop", app)
         self.assertEqual(app.count(" accept\n"), 2)
-        self.assertNotIn("dport 53", app)
+        self.assertNotIn("dport 53 accept", app)
+        self.assertIn("udp dport 53 counter name dns_docker_udp drop", app)
+        self.assertIn("udp dport 53 counter name dns_public_udp drop", app)
         self.assertNotIn("dport 443", app)
         self.assertIn("ip daddr " + V["proxy"] + " tcp dport 3128", app)
+    def test_dns_evidence(self):
+        before = {"dns_docker_udp": 3, "dns_public_udp": 5}
+        self.assertEqual(dns_denial_evidence(before, before, False),
+                         {"DNS_GUARD_DOCKER": False, "DNS_GUARD_PUBLIC": False})
+        self.assertEqual(dns_denial_evidence(before, before, True),
+                         {"DNS_GUARD_DOCKER": False, "DNS_GUARD_PUBLIC": True})
+        self.assertEqual(dns_denial_evidence(before,
+                         {"dns_docker_udp": 4, "dns_public_udp": 5}, True),
+                         {"DNS_GUARD_DOCKER": True, "DNS_GUARD_PUBLIC": True})
+        self.assertEqual(dns_denial_evidence(before,
+                         {"dns_docker_udp": 4, "dns_public_udp": 6}, False),
+                         {"DNS_GUARD_DOCKER": True, "DNS_GUARD_PUBLIC": True})
     def test_proxy_policy(self):
         policy = namespace_policy(V, True, ["8.8.8.0/24"])
         self.assertIn("8.8.8.0/24", policy)

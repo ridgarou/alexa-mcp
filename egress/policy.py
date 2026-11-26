@@ -90,6 +90,11 @@ def namespace_policy(v, proxy=False, extra=()):
     ]
     if not proxy:
         lines += [
+            # Count explicit UDP denials before Docker's DNS DNAT.
+            f"add counter inet {TABLE} dns_docker_udp",
+            f"add counter inet {TABLE} dns_public_udp",
+            f"add rule inet {TABLE} output ip daddr 127.0.0.11 udp dport 53 counter name dns_docker_udp drop",
+            f"add rule inet {TABLE} output ip daddr {{ {', '.join(DNS)} }} udp dport 53 counter name dns_public_udp drop",
             f"add rule inet {TABLE} output ip saddr {a} ip daddr {p} tcp dport 3128 accept",
             f"add rule inet {TABLE} input ip saddr {p} ip daddr {a} tcp sport 3128 ct state established accept",
         ]
@@ -108,3 +113,12 @@ def namespace_policy(v, proxy=False, extra=()):
         ]
     lines += [f"add rule inet {TABLE} output counter drop", f"add rule inet {TABLE} input counter drop"]
     return "\n".join(lines) + "\n"
+
+
+def dns_denial_evidence(before, after, no_public_route):
+    """Socket errors alone never establish an effective DNS guard."""
+    return {
+        "DNS_GUARD_DOCKER": after["dns_docker_udp"] > before["dns_docker_udp"],
+        "DNS_GUARD_PUBLIC": (after["dns_public_udp"] > before["dns_public_udp"]
+                             or no_public_route),
+    }
