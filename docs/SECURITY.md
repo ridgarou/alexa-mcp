@@ -5,10 +5,9 @@ a369d5f86858d8d43d4a982bedc5bffdaacccf0c. Preserve upstream MIT notices.
 
 ## Build and review
 
-Run `node scripts/resolve-hardened-dependencies.mjs` in a clean checkout with
-Node 22 and npm 10, review the resulting package.json and package-lock.json,
-and commit both together. The migration must pass the registry audit. Do not
-use npm audit fix --force or bypass peer dependency checks. Then run:
+Use the checked-in audited lockfile with Node 22. Do not regenerate it during
+ordinary builds. Review dependency changes in a separate PR, and never use
+npm audit fix --force or bypass peer dependency checks. Run:
 
 ```sh
 npm ci --ignore-scripts
@@ -23,8 +22,8 @@ docker run --rm --network none --read-only --cap-drop ALL \
 ```
 
 Scan the resulting runtime image with Trivy; review all HIGH/CRITICAL
-findings, including Debian and the Node runtime. Pin reviewed base image
-digests for releases. The runtime intentionally has no npm, Yarn or Corepack.
+findings, including Debian and the Node runtime. The default base images are digest-pinned; Debian security packages are
+updated at build time, so this is not a bit-for-bit reproducible image. The runtime intentionally has no npm, Yarn or Corepack.
 The builder still uses npm, so build-time auditing remains necessary.
 
 ## Local deployment
@@ -48,7 +47,7 @@ from the client to the Docker host, forwarding local 127.0.0.1:3456 to
 
 ```sh
 docker compose -f compose.yml -f compose.auth.yml run --rm --no-deps \
-  --service-ports -T AlexaMCP sh -c 'umask 077; node dist/auth-cli.js >/dev/null 2>&1'
+  --service-ports -T AlexaMCP sh -ec 'umask 077; test ! -e /app/.auth/alexa.json; test ! -L /app/.auth/alexa.json; node dist/auth-cli.js >/dev/null 2>&1; test -s /app/.auth/alexa.json; chmod 600 /app/.auth/alexa.json'
 ```
 
 Open http://127.0.0.1:3456 in the client browser. Stop the container and close
@@ -58,14 +57,17 @@ login proxy through a reverse proxy or directly to the LAN. The proxy handles
 sensitive login traffic; the dependency patch relaxes one CSP directive
 for local HTTP compatibility. Do not treat it as a general security fix.
 
-Do not force reauthentication while a valid session exists. Never share raw
+The authentication command refuses to overwrite an existing session. Stop
+other MCP/auth processes before authentication or renewal testing. Atomic
+replacement does not provide a multi-process lock or guarantee durability
+across power loss. Do not force reauthentication while a valid session exists. Never share raw
 auth logs. The normal server must not intentionally expose login ports.
 
 ## Outstanding work
 
-- Validate the reconstructed lockfile, runtime image and proxy patch.
 - Review all read-tool implementations, not just their names.
-- Make credential persistence atomic and sanitize runtime errors.
+- Validate atomic credential replacement with a real token refresh and review
+  other potentially sensitive errors in the runtime.
 - Verify that invalid stored credentials cannot start an interactive proxy.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
@@ -76,3 +78,14 @@ auth logs. The normal server must not intentionally expose login ports.
 The read-only MCP setting is an application control, not an Amazon account
 permission boundary. Offline tests do not prove absence of malicious code,
 network exfiltration or changes made internally by authentication libraries.
+
+## CI and GitHub Free
+
+Automatic validation uses a standard Ubuntu runner with Node 22. The optional
+compatibility matrix is manual; overlapping runs for the same ref are cancelled.
+Trivy JSON reports are retained for seven days. Dependabot configuration limits
+version-update PRs to one per ecosystem and checks weekly. It becomes active
+when available on the default branch; base digests and the pinned dependency
+patch still need review. No automatic deployment, image publishing, paid runner
+or auto-merge is enabled by this change. Public GHCR publishing will be a separate
+explicitly controlled step after validation.

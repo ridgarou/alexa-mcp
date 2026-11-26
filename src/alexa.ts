@@ -125,7 +125,7 @@ export function initAlexa(
       (err?: Error) => {
         if (settled) {
           // Re-fired by the refresh timer: just log; the promise is long resolved.
-          if (err) (cfg.logger ?? console.error)(`[alexa] refresh error: ${err.message}`);
+          if (err) (cfg.logger ?? console.error)("[alexa] Refresh failed. Details suppressed.");
           return;
         }
         // alexa-cookie2 calls this callback TWICE: first with the
@@ -144,7 +144,7 @@ export function initAlexa(
           if (!interactive && isProxyPrompt(err)) {
             reject(new Error("Alexa token expired/invalid — re-login needed: `npm run auth`."));
           } else {
-            reject(err);
+            reject(new Error("Alexa initialization failed. Details suppressed."));
           }
           return;
         }
