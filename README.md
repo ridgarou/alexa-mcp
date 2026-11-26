@@ -497,9 +497,13 @@ settings unchanged for normal operation.
 - Authentication logs are suppressed and the Compose logging driver is
   disabled; no real account data belongs in GitHub Actions or issue reports.
 
+## Stable release preparation
+
+The current published image is RC.2. The 1.0.0 source preparation is not a published stable release. See [stable acceptance](docs/STABLE_ACCEPTANCE.md) for live evidence, pending checks and the manual publication gate.
+
 ## Known limitations
 
-- In the published RC.2 image, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live verification is still pending. The inventory tools do not require live state queries.
+- In the published RC.2 image, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live regression verified the controlled timeout and a subsequent successful inventory call; successful state retrieval remains unverified. The inventory tools do not require live state queries.
 
 - **Unofficial API** — can break whenever Amazon changes it.
 - **Routine deletion endpoint is unverified.** `alexa_delete_routine` attempts

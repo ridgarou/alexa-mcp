@@ -7,6 +7,11 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare independent stable version 1.0.0 with no dependency or application behavior changes from RC.2. Extend the manual GHCR workflow to accept stable SemVer only after explicit stable approval and a reviewed version-specific acceptance record. Stable publication remains blocked pending the outstanding checks in [STABLE_ACCEPTANCE.md](docs/STABLE_ACCEPTANCE.md).
+- Record sanitized RC.2 host regression, credential reuse and initial performance evidence; keep real state retrieval, RC.2 natural renewal and anonymous pull distinct from completed checks.
+
 ## [1.0.0-rc.2] - 2026-11-26
 
 Second release candidate, published to GHCR after the device-state correction.

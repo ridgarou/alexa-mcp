@@ -190,7 +190,8 @@ New builds require a new scan.
 2. Manual publication of 1.0.0-rc.1 and 1.0.0-rc.2 completed; see
    [GHCR.md](GHCR.md) and [CHANGELOG.md](../CHANGELOG.md) for evidence.
    RC.1 passed 14/15 basic live checks and exposed a device-state error
-   handling defect. RC.2 fixes it; live regression and renewal are pending.
+   handling defect. RC.2 live regression verified all other tools and controlled state
+   timeout; natural RC.2 renewal remains pending.
 3. Verify anonymous pull and image metadata on the host without changing
    the working installation. Prepare independent candidate configuration,
    preserve rollback and test using the valid existing session safely.
@@ -219,8 +220,8 @@ not an active task or deployed service.
 
 ## ADR-010 — Bound live device-state requests and report errors explicitly
 
-**Date:** 2026-11-26 · **Status:** Accepted; implementation published in RC.2,
-live verification pending.
+**Date:** 2026-11-26 · **Status:** Accepted; implementation published in RC.2;
+controlled timeout and subsequent inventory verified live, state retrieval pending.
 
 RC.1 live acceptance passed basic checks for 14 of 15 read tools. The
 state endpoint returned a JSON message matching throttling patterns,
@@ -249,6 +250,21 @@ messages or weakening existing authentication/security controls.
 after a normal quiet interval, confirming either valid state or an
 explicit error within the response deadline. Record actual successful
 state retrieval separately. No retries to bypass a rate limit.
+
+## ADR-011 — Stable publication acceptance gate
+
+**Date:** 2026-11-26 · **Status:** Accepted for preparation; stable approval pending.
+
+Reuse the single manual GHCR publication workflow for RC and stable
+SemVer, with the same build, security and immutable-tag gates. Stable
+versions additionally require explicit workflow approval and a
+version-specific reviewed acceptance record in docs/stable-acceptance.json.
+All acceptance fields start false; never mark them true without evidence
+and maintainer approval. See [STABLE_ACCEPTANCE.md](STABLE_ACCEPTANCE.md).
+Do not publish stable before natural RC.2 renewal, anonymous pull and
+acceptance of the documented residual risks. This is a human evidence
+gate, not a CI live account test. No secrets or paid services are added.
+The version-specific record must be updated for future stable releases.
 
 ## How to update this record
 
