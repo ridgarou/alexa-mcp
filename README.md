@@ -27,6 +27,13 @@ Docker configuration.
 > The temporary login proxy handles sensitive authentication traffic.
 > Keep it private.
 
+## Project governance
+
+- [AGENTS.md](AGENTS.md): repository-wide instructions for maintainers and AI agents.
+- [Technical decision log](docs/DECISIONS.md): architecture, versioning, security,
+  GitHub Free constraints, release criteria and future roadmap.
+- [CHANGELOG.md](CHANGELOG.md): release history and unreleased changes.
+
 ## Contents
 
 - [Docker quick start](#docker-quick-start)

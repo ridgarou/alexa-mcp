@@ -1,0 +1,220 @@
+# Technical decision log
+
+This record captures the project's durable decisions, their rationale,
+consequences and review conditions. Read [AGENTS.md](../AGENTS.md) for
+operational instructions. Accepted means the decision is agreed; it does
+not imply that every implementation or test is complete.
+
+## ADR-001 — Independent fork and SemVer
+
+**Date:** 2026-11-26 · **Status:** Accepted
+
+The project originates from snordquist/alexa-mcp 0.7.0, commit
+a369d5f86858d8d43d4a982bedc5bffdaacccf0c. Keep MIT attribution, but use an
+independent release lifecycle. The maintainer approved dropping the
+hardened suffix and starting at 1.0.0-rc.1. Subsequent candidates use rc.2,
+rc.3, etc.; stable 1.0.0 follows live acceptance. Use patch versions for
+compatible fixes, minor versions for compatible features and major
+versions for incompatible changes.
+
+package.json is the application version authority; lockfile root metadata,
+MCP handshake, OCI label and GHCR release tag must agree. The npm package
+is private to prevent accidental npm publication. Keep old release names
+and digests as historical facts, not rewritten aliases. No latest tag.
+
+**Rationale:** avoid coupling the fork's roadmap and version numbers to
+upstream while preserving provenance and avoiding version drift.
+
+**Consequence:** 1.0.0-rc.1 requires a validated new build. Merely retagging
+an older binary does not update its embedded version. For a stable
+release whose embedded version changes, build and validate again.
+If promoting an existing digest without rebuilding is ever desired,
+document the embedded-version difference and obtain explicit approval
+rather than violating the consistency rule.
+
+## ADR-002 — Branching, documentation and controlled integration
+
+**Date:** 2026-11-26 · **Status:** Accepted
+
+Use feature/fix/docs branches from develop, PRs into develop (squash),
+then reviewed promotion to main (merge preserving ancestry). Check the
+exact head and successful CI. No automatic merge or direct unreviewed
+promotion. Group related changes to limit redundant CI. Maintain an English
+README, CHANGELOG (Keep a Changelog with Unreleased), and technical docs.
+Add or supersede decisions here when changing a project-wide rule.
+
+**Rationale:** maintain an auditable history, independent development and
+release boundaries, and consistent instructions for future agents.
+
+## ADR-003 — GitHub Free and efficient CI/CD
+
+**Date:** 2026-11-26 · **Status:** Accepted
+
+The maintainer uses GitHub Free. Keep the public repository and public
+GHCR distribution; standard hosted Ubuntu runners only. Do not incur
+paid charges or enable paid services without explicit permission.
+Verify billing conditions before changing the architecture.
+Use one automatic shared validation action, manual compatibility checks,
+cancel superseded runs, timeouts and seven-day retention of compact
+Trivy reports. No image archives as Actions artifacts. Avoid building
+for publication on every commit. Dependabot checks weekly (npm, Docker,
+Actions), with at most one open version-update PR per ecosystem toward
+develop; no unattended merge.
+
+**Rationale:** keep cost and maintenance overhead low without weakening
+security checks. Public package visibility was confirmed by the maintainer;
+anonymous download still needs direct verification.
+
+## ADR-004 — Release gate and immutable deployment identity
+
+**Date:** 2026-11-26 · **Status:** Accepted; candidate publishing implemented,
+stable promotion procedure pending.
+
+Only publish with deliberate workflow_dispatch from main and explicit
+confirmation. Use the exact tested linux/amd64 image from the validation
+job; packages:write only where needed. Pin reviewed action and base-image
+digests. Use the version as the GHCR tag, block existing tags, and record
+the digest. Never treat a mutable tag as deployment identity. Retain the
+previous image/digest and configuration for rollback. No automatic
+deployment, no Watchtower updates and no unnecessary republishing.
+
+Release gates include locked dependencies, npm audit and provenance,
+unit/offline MCP tests, strict proxy patch, Docker build, user and
+permissions checks, Compose validation and Trivy. Block critical and
+fixable high findings; review unfixed highs rather than suppressing them.
+No real account data in CI. Investigate failed attestations; never disable
+the check merely to continue. The earlier eventsource-parser attestation
+failure did not recur in later runs; its root cause is unknown.
+
+**Rationale:** publish only reviewed artifacts and preserve recoverability.
+A successful registry push does not prove anonymous access or live
+Amazon integration. Base digests plus npm locks improve repeatability;
+Debian security updates and changing scanner databases mean builds are
+not guaranteed bit-for-bit reproducible.
+
+## ADR-005 — Docker-first minimal runtime and low resource usage
+
+**Date:** 2026-11-26 · **Status:** Accepted and implemented in candidate.
+
+Target a headless Linux amd64 home server with Docker Compose v2.
+Build with Node 22; run on Debian 13 with only the runtime and production
+dependencies, no npm/Yarn/Corepack. Use UID/GID 1000, root-owned code,
+read-only root filesystem, no privileges, cap_drop ALL, bounded memory
+and processes, a dedicated bridge and a narrow writable auth mount.
+Use on-demand stdio rather than an always-on HTTP server. Preserve
+service name AlexaMCP and keep explicit auth configuration separate.
+
+**Rationale:** small attack surface, low idle consumption, portability and
+limited effects on other home-server workloads.
+
+**Review:** additional services or changes to resource limits require
+a concrete need and measurement where practical. The bridge alone does
+not enforce outbound restrictions.
+
+## ADR-006 — Read-only auditing and agent boundaries
+
+**Date:** 2026-11-26 · **Status:** Accepted; static and offline validation
+complete for the original 15 read tools, live checks pending.
+
+The immediate goal is inventory before cleanup: Alexa devices, routines,
+groups, scenes, broken references and source clues. Existing upstream
+write tools are retained in code but not registered in the supplied
+read-only Compose configuration. Do not execute routines, delete devices,
+modify groups or change Amazon account state at an agent's discretion.
+Any write workflow requires a separate authorized design. Read-only
+application controls do not limit Amazon credentials; read queries can
+use POST and authentication/renewal may change account metadata.
+
+Codex or any other agent must not receive a Docker socket, host-level
+control, auth file access or unrelated application access. An isolated
+agent needs a separately reviewed narrow gateway; the host-side trusted
+stdio launcher is not a secure gateway for untrusted agents.
+Treat returned data as private and untrusted, not as executable prompts.
+
+**Rationale:** prevent autonomous changes to the home environment and
+avoid lateral movement or disclosure. Source/manufacturer data is not a
+guaranteed complete inventory of installed Alexa skills.
+
+## ADR-007 — Private authentication and persistent credentials
+
+**Date:** 2026-11-26 · **Status:** Accepted; implementation tested offline,
+real token refresh and failure handling pending.
+
+Credentials stay only on the deployment host, outside the repository and
+Docker build context. Default private auth directory mode 0700 and
+credential file mode 0600; correct ownership for the container UID/GID.
+Reuse a valid session; no forced login during upgrades. Atomic file
+replacement, reject malformed data and symlink reads, suppress sensitive
+errors and raw logs. Use one credential writer at a time; atomic writes
+are not interprocess locking or full power-loss durability.
+
+Normal MCP does not open a login port. Only explicit CLI authentication
+uses a temporary proxy bound on host loopback, reached via SSH tunnel for
+remote hosts. Do not expose via LAN, Internet or reverse proxy. Close the
+session when done. If renewal fails, block fallback proxy generation;
+require explicit reauthentication. Preserve valid credentials and plan
+revocation safely. Deleting a file alone does not revoke a session.
+
+**Rationale:** protect long-lived account credentials and prevent
+unintended network exposure. The unofficial proxy handles sensitive
+traffic; its CSP compatibility patch relaxes one directive for local
+HTTP only and must remain narrowly scoped and version-reviewed.
+
+## ADR-008 — Dependency maintenance and vulnerability policy
+
+**Date:** 2026-11-26 · **Status:** Accepted.
+
+Pin the reviewed MCP SDK, alexa-remote2, Zod and dependency overrides in
+the committed lockfile. Use npm ci --ignore-scripts, review integrity
+and provenance, and strictly apply the proxy patch to the reviewed
+alexa-cookie2 version. Re-audit upstream auth fallback, read methods,
+patch compatibility and tool schemas on updates. Never use forced
+audit fixes or skip checks merely to pass CI.
+
+Review remaining vulnerabilities individually as needed; keep evidence
+and do not imply zero risk from a green gate. The last published legacy
+candidate's audit reported 0 npm vulnerabilities, 0 critical image
+findings, 0 fixable highs and 52 unfixed high findings (13 distinct
+advisory IDs). This is historical evidence, not a permanent guarantee.
+New builds require a new scan.
+
+## ADR-009 — Local acceptance and future development sequence
+
+**Date:** 2026-11-26 · **Status:** Accepted plan; not all tasks implemented.
+
+1. Complete independent versioning validation and promotion.
+2. Manually publish 1.0.0-rc.1 and record its exact digest and results.
+3. Verify anonymous pull and image metadata on the host without changing
+   the working installation. Prepare independent candidate configuration,
+   preserve rollback and test using the valid existing session safely.
+4. Verify real read-only inventory, error handling, credentials reuse and
+   renewal; test explicit auth and absence of unintended proxy exposure
+   when needed. Record sanitized acceptance results.
+5. Obtain maintainer acceptance for 1.0.0 stable; document residual risk.
+   Stable must not be claimed until real integration is verified.
+6. Implement and verify outbound network restrictions with narrowly scoped
+   Amazon destinations and request semantics. Do not present the bridge
+   as an allowlist; do not blindly block all POST requests.
+7. Design a constrained Codex integration without granting the agent
+   Docker access or credentials. Review permissions and threat model
+   before any deployment.
+8. Implement local JSON/CSV inventory export: on demand and optionally
+   weekly, preserve last successful snapshot, keep history and distinguish
+   unknown source/skill data from confirmed data. No credentials in
+   exports. Store and restrict sensitive inventory locally.
+
+The exporter, agent gateway and additional egress controls are distinct
+features, not required for the first stable application version if its
+live acceptance criteria are met and limitations are disclosed. Egress
+restrictions and the restricted gateway must be reviewed before granting
+an untrusted agent live account access. Any schedule is a future proposal,
+not an active task or deployed service.
+
+## How to update this record
+
+Use the next ADR number. Include date, status, context, decision, rationale,
+consequences and validation/review conditions. Mark an obsolete ADR
+Superseded by the new ADR, retaining history. Distinguish maintainer-approved
+requirements, engineering choices, and unimplemented proposals. Never
+include actual credentials, private host addresses, device inventories
+or account data in this public repository.
