@@ -1,17 +1,17 @@
 {
   "name": "alexa-mcp",
-  "version": "0.7.0",
+  "version": "1.0.0-rc.1",
   "description": "MCP server to audit and clean up Amazon Alexa: list/inspect/delete routines, list and delete smart-home devices (orphan cleanup), scenes and activity history. Built on alexa-remote2.",
   "type": "module",
   "license": "MIT",
   "author": "Sascha Nordquist (https://github.com/snordquist)",
-  "homepage": "https://github.com/snordquist/alexa-mcp#readme",
+  "homepage": "https://github.com/ridgarou/alexa-mcp#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/snordquist/alexa-mcp.git"
+    "url": "git+https://github.com/ridgarou/alexa-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/snordquist/alexa-mcp/issues"
+    "url": "https://github.com/ridgarou/alexa-mcp/issues"
   },
   "keywords": [
     "mcp",
@@ -63,5 +63,6 @@
       ".": "5.0.6",
       "cookie": "0.7.2"
     }
-  }
+  },
+  "private": true
 }

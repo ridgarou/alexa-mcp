@@ -6,6 +6,10 @@ runs:
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '22'
+    - name: Verify manifest versions
+      shell: bash
+      run: |
+        node -e 'const p=require("./package.json"), l=require("./package-lock.json"); if(p.version!==l.version || p.version!==l.packages[""].version) process.exit(1)'
     - run: npm ci --ignore-scripts
       shell: bash
     - run: npm audit --include=dev --audit-level=low
@@ -30,6 +34,7 @@ runs:
           --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
           --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
           --label "org.opencontainers.image.licenses=MIT" \
+          --label "org.opencontainers.image.version=$(node -p 'require("./package.json").version')" \
           -t local/alexa-mcp:hardened-candidate .
     - name: Test runtime offline
       shell: bash
