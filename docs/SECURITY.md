@@ -65,10 +65,12 @@ auth logs. The normal server must not intentionally expose login ports.
 
 ## Outstanding work
 
-- Review all read-tool implementations, not just their names.
+- Review the static [read-only audit](READ_ONLY_AUDIT.md) and validate
+  actual requests and returned data on the deployment host.
 - Validate atomic credential replacement with a real token refresh and review
   other potentially sensitive errors in the runtime.
-- Verify that invalid stored credentials cannot start an interactive proxy.
+- Validate the noninteractive authentication guard against actual expired
+  sessions on the deployment host; offline tests cover simulated failure.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
 - Verify real Amazon access and token refresh on the host only.

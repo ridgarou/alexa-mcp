@@ -65,6 +65,27 @@ export interface InitResult {
  *                     prompt; it should fail loudly and tell the user to run
  *                     `npm run auth`).
  */
+export const RELOGIN_REQUIRED = "Alexa token expired/invalid — re-login needed: run the explicit authentication command.";
+export const NO_AUTH = "No Alexa auth found (.auth/alexa.json). Run the explicit authentication command first.";
+
+/**
+ * alexa-remote2 8.1.1 calls generateCookie when refresh or auth validation fails.
+ * Intercept that method on the instance before init, including future refreshes.
+ * Do not rely on proxyOnly: that option selects a proxy, not a prohibition.
+ */
+export function createAlexaRemote(interactive: boolean): AlexaRemote {
+  const alexa = new AlexaRemote();
+  if (!interactive) {
+    const remote = alexa as unknown as {
+      generateCookie: (email: unknown, password: unknown, callback: (err: Error) => void) => void;
+    };
+    remote.generateCookie = (_email, _password, callback) => {
+      callback(new Error(RELOGIN_REQUIRED));
+    };
+  }
+  return alexa;
+}
+
 export function initAlexa(
   cfg: AlexaConfig = defaultConfig(),
   interactive = false,
@@ -74,12 +95,12 @@ export function initAlexa(
   if (!stored && !interactive) {
     return Promise.reject(
       new Error(
-        "No Alexa auth found (.auth/alexa.json). Run `npm run auth` first to log in once.",
+        NO_AUTH,
       ),
     );
   }
 
-  const alexa = new AlexaRemote();
+  const alexa = createAlexaRemote(interactive);
 
   // Write the token back on every refresh/login.
   // The 'cookie' event fires on the first login AND on every 4-day refresh
@@ -113,7 +134,7 @@ export function initAlexa(
         proxyLogLevel: "warn",
         bluetooth: false,
         notifications: false,
-        logger: cfg.logger,
+        logger: undefined,
         amazonPage: cfg.amazonPage,
         acceptLanguage: cfg.acceptLanguage,
         amazonPageProxyLanguage:
@@ -141,8 +162,8 @@ export function initAlexa(
         }
         settled = true;
         if (err) {
-          if (!interactive && isProxyPrompt(err)) {
-            reject(new Error("Alexa token expired/invalid — re-login needed: `npm run auth`."));
+          if (!interactive && (err.message === RELOGIN_REQUIRED || isProxyPrompt(err))) {
+            reject(new Error(RELOGIN_REQUIRED));
           } else {
             reject(new Error("Alexa initialization failed. Details suppressed."));
           }
