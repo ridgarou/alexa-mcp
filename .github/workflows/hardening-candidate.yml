@@ -16,29 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Resolve candidate dependencies
-        run: node scripts/resolve-hardened-dependencies.mjs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: candidate-manifests
-          path: |
-            package.json
-            package-lock.json
-          if-no-files-found: error
-      # Temporary transfer of public dependency manifests for review by the maintainer.
-      - name: Export manifest checksums and contents
-        run: |
-          python3 - <<'PY'
-          import base64, hashlib
-          for name in ("package.json", "package-lock.json"):
-              data = open(name, "rb").read()
-              print("MANIFEST_SHA256 " + name + " " + hashlib.sha256(data).hexdigest())
-              encoded = base64.b64encode(data).decode("ascii")
-              for i in range(0, len(encoded), 2048):
-                  print("MANIFEST_CHUNK " + name + " " + str(i // 2048) + " " + encoded[i:i+2048])
-          PY
       - run: npm ci --ignore-scripts
       - run: npm audit --include=dev --audit-level=low
+      - run: git diff --exit-code -- package.json package-lock.json
       - run: npm audit signatures
       - run: npm test
       - run: timeout 60s node tests/security/mcp-readonly.mjs
@@ -59,7 +39,8 @@ jobs:
       - name: Scan runtime image
         run: |
           docker save -o /tmp/alexa-image.tar local/alexa-mcp:hardened-candidate
-          docker run --rm --cap-drop ALL --security-opt no-new-privileges:true -v /tmp/alexa-image.tar:/scan/image.tar:ro aquasec/trivy:0.76.2 image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --format json --timeout 10m > /tmp/trivy-report.json
+          chmod 0644 /tmp/alexa-image.tar
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges:true -v /tmp/alexa-image.tar:/scan/image.tar:ro aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --format json --timeout 10m > /tmp/trivy-report.json
       - uses: actions/upload-artifact@v4
         with:
           name: candidate-trivy-report
