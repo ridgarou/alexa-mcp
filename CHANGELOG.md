@@ -36,6 +36,10 @@ No candidate image or stable release has been published yet.
   Publication uses the tested image, unique versioned tags and digest
   reporting, without a latest tag or automatic deployment.
 - This changelog for tracking future changes and releases.
+- Docker-first README covering local builds, region configuration, private
+  credentials, SSH-tunnel authentication, stdio MCP clients, future GHCR
+  deployment, troubleshooting and rollback; corrected legacy LAN exposure
+  guidance. Native installation and upstream tool reference are retained.
 
 ### Changed
 
@@ -105,6 +109,11 @@ No candidate image or stable release has been published yet.
   reported an invalid attestation. The security gate remains enabled;
   the shared workflow requires a successful revalidation before integration
   or publication. The failure is not evidence by itself of package tampering.
+- Subsequent [run 45765449908](https://github.com/ridgarou/alexa-mcp/actions/runs/45765449908)
+  passed shared CI on 2026-11-26: 157 registry signatures, 18 attestations,
+  18 unit tests and both MCP checks passed. Trivy reported 52 high, zero
+  critical and zero fixable findings (13 unique advisories). The previous
+  attestation failure did not recur; its root cause has not been established.
 - Pending: real Amazon authentication/refresh testing, egress restrictions,
   GHCR publication verification, host deployment, Codex integration and
   JSON/CSV export. These are not completed features.
