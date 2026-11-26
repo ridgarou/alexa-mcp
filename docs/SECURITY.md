@@ -74,7 +74,8 @@ auth logs. The normal server must not intentionally expose login ports.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
 - Verify real Amazon access and token refresh on the host only.
-- Add a controlled release pipeline and digest-pinned deployment.
+- Validate manual GHCR candidate publication and deploy only by a reviewed
+  digest after real integration checks.
 - Do not give agents a Docker socket or access to credential files.
 
 The read-only MCP setting is an application control, not an Amazon account
@@ -88,6 +89,6 @@ compatibility matrix is manual; overlapping runs for the same ref are cancelled.
 Trivy JSON reports are retained for seven days. Dependabot configuration limits
 version-update PRs to one per ecosystem and checks weekly. It becomes active
 when available on the default branch; base digests and the pinned dependency
-patch still need review. No automatic deployment, image publishing, paid runner
-or auto-merge is enabled by this change. Public GHCR publishing will be a separate
-explicitly controlled step after validation.
+patch still need review. No automatic deployment, automatic image publishing, paid runner or auto-merge
+is enabled. Candidate publication uses a separate manual workflow on main only.
+See [GHCR publication](GHCR.md).
