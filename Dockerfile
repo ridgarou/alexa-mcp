@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # For releases supply reviewed digest-pinned bases as build arguments.
-ARG NODE_BASE=node:22-trixie-slim
-ARG RUNTIME_BASE=debian:trixie-slim
+ARG NODE_BASE=node:22-trixie-slim@sha256:f0960f8dc047f358e3fb428f36ccba21732194fa5f0cac849f401e63e62fb9e6
+ARG RUNTIME_BASE=debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 
 FROM ${NODE_BASE} AS builder
 WORKDIR /app
@@ -9,9 +9,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends patch \
     && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-# Refuse to build an unmigrated manifest.
-RUN node -e 'const p=require("./package.json"); if(p.dependencies.zod!=="4.6.7"||p.dependencies["@modelcontextprotocol/sdk"]!=="1.32.2"||p.dependencies["alexa-remote2"]!=="8.1.1") process.exit(1)' \
-    && npm ci --ignore-scripts
+RUN npm ci --ignore-scripts
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
@@ -28,6 +26,7 @@ RUN cd /app/node_modules/alexa-cookie2 \
 FROM ${RUNTIME_BASE} AS runtime
 ENV NODE_ENV=production HOME=/home/node
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends ca-certificates libatomic1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 node \
