@@ -1,0 +1,18 @@
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!src/**
+!patches/
+!patches/alexa-cookie-proxy.patch
+# Never send authentication material, even if placed inside an allowed directory.
+**/.auth
+**/.auth/**
+**/auth
+**/auth/**
+**/alexa.json
+**/.env
+**/.env.*
+**/*.log

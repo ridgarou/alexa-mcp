@@ -1,26 +1,29 @@
-name: CI
+name: Compatibility CI (manual)
 
+# The hardened workflow covers ordinary main/develop PRs and pushes.
+# Keep the upstream compatibility matrix available without duplicate automatic runs.
 on:
-  push:
-    branches: [main]
-  pull_request:
-
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: compatibility-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22, 24]
+        node-version: [22, 24]
     name: test (node ${{ matrix.node-version }})
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
-      - run: npm ci
-      - name: Build (tsc)
-        run: npm run build
-      - name: Run tests
-        run: node --test
+      - run: npm ci --ignore-scripts
+      - run: npm test

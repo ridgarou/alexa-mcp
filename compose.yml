@@ -1,0 +1,46 @@
+name: alexa-mcp
+services:
+  AlexaMCP:
+    image: ${ALEXA_MCP_IMAGE:-local/alexa-mcp:hardened-candidate}
+    restart: "no"
+    init: true
+    stdin_open: true
+    tty: false
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 384m
+    environment:
+      NODE_ENV: production
+      ALEXA_MCP_AMAZON_PAGE: "${ALEXA_MCP_AMAZON_PAGE:-amazon.de}"
+      ALEXA_MCP_ACCEPT_LANGUAGE: "${ALEXA_MCP_ACCEPT_LANGUAGE:-de-DE}"
+      ALEXA_MCP_PROXY_LANGUAGE: "${ALEXA_MCP_PROXY_LANGUAGE:-}"
+      ALEXA_MCP_ALLOW_WRITE: "0"
+      ALEXA_MCP_AUTH_PATH: "/app/.auth/alexa.json"
+      ALEXA_MCP_PROXY_IP: "127.0.0.1"
+      ALEXA_MCP_PROXY_PORT: "3456"
+      ALEXA_MCP_PROXY_BIND: "127.0.0.1"
+      ALEXA_MCP_WS_MQTT: "false"
+    volumes:
+      - type: bind
+        source: ${ALEXA_MCP_AUTH_DIR:-/var/lib/alexa-mcp/auth}
+        target: /app/.auth
+        read_only: false
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    logging:
+      driver: "none"
+    networks:
+      - alexa_net
+networks:
+  alexa_net:
+    driver: bridge

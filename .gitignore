@@ -6,3 +6,8 @@ dist/
 .env
 .env.*
 *.tgz
+
+# Local authentication and deployment secrets
+alexa.json
+auth/
+!.env.example
