@@ -195,9 +195,30 @@ def probe(cid, v, amazon=False):
     source = (ROOT / "probe.mjs").read_text()
     r = cmd(DOCKER + ["exec", "-i", cid, "node", "--input-type=module", "-",
           v["proxy"], v["gateway"], "amazon" if amazon else "offline"], data=source,
-          timeout=90)
-    # Probe emits only fixed labels and timings; never forward raw upstream errors.
-    note(r.stdout.strip())
+          timeout=90, check=False)
+    # Strictly filter output, including failed probes. Never print raw stderr.
+    # Require the full ordered result list, not just a successful exit code.
+    ids = ("PROXY_UNKNOWN", "PROXY_PUBLIC_IP", "PROXY_GATEWAY_IP", "PROXY_LOOPBACK",
+           "PROXY_WRONG_PORT", "PROXY_SUFFIX_TRICK", "PROXY_IPV6_LITERAL",
+           "PROXY_PLAIN_HTTP", "DIRECT_PUBLIC", "DIRECT_GATEWAY",
+           "DIRECT_DOCKER_DNS_TCP", "DIRECT_PUBLIC_DNS_TCP", "DIRECT_IPV6",
+           "DIRECT_DOCKER_DNS_UDP", "DIRECT_PUBLIC_DNS_UDP")
+    results = []
+    summaries = []
+    for line in r.stdout.splitlines():
+        match = re.fullmatch(r"PROBE ([A-Z0-9_]+) (PASS|FAIL) ([A-Z0-9_]{1,64})", line)
+        if match and match[1] in (*ids, "AMAZON_TLS"):
+            results.append((match[1], match[2]))
+            note(line)
+        elif re.fullmatch(r"PROBE_SUMMARY (?:PASS|FAIL) [0-9]{1,3}", line):
+            summaries.append(line)
+            note(line)
+    expected = (*ids, "AMAZON_TLS") if amazon else ids
+    if (r.returncode or tuple(i for i, status in results) != expected
+            or any(status != "PASS" for i, status in results)
+            or summaries != ["PROBE_SUMMARY PASS 0"]):
+        raise RuntimeError("Isolation probes failed or incomplete")
+
 
 def stop_project(env):
     compose(env, ["down", "--timeout", "5"], timeout=45)
