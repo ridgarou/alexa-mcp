@@ -499,6 +499,8 @@ settings unchanged for normal operation.
 
 ## Known limitations
 
+- In the RC.2 source, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. The published RC.1 does not contain this fix; consult the changelog for publication status. The inventory tools do not require live state queries.
+
 - **Unofficial API** — can break whenever Amazon changes it.
 - **Routine deletion endpoint is unverified.** `alexa_delete_routine` attempts
   `DELETE /api/behaviors/v2/automations/{id}`, which is not documented or confirmed. Verify the

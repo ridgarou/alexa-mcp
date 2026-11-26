@@ -7,6 +7,16 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+### Fixed
+
+- Live device-state queries no longer treat rate-limit messages, malformed responses, empty states or endpoint errors as successful MCP calls. Return sanitized, machine-readable error codes without upstream error payloads.
+- Bound device-state response waiting after initialization to 25 seconds, pass a 15-second upstream request timeout, enforce one outstanding state request per MCP process, and apply a 60-second cooldown on throttling or timeout. No additional retry is introduced; upstream internal retries may still run after the response deadline.
+- Prepare 1.0.0-rc.2 for a fresh validated build. RC.1 remains the published candidate until RC.2 publication succeeds. Live acceptance found 14/15 tools passed basic checks; the state query returned a throttling message as success. No account-specific data is recorded.
+
+### Added
+
+- Synthetic device-state regression tests covering successful state, throttling, invalid/empty responses, partial failures, timeout, concurrency, cooldown and duplicate callbacks.
+
 ## [1.0.0-rc.1] - 2026-11-26
 
 First published candidate under independent SemVer. This is not a stable release.

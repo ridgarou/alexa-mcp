@@ -14,6 +14,9 @@ import type AlexaRemote from "alexa-remote2";
 import { initAlexa, NO_AUTH, RELOGIN_REQUIRED } from "./alexa.js";
 import { writeRoutine, setRoutineEnabled, type TriggerSpec } from "./routines.js";
 import { flattenAppliances, collectRoutineTargets } from "./util.js";
+import { createDeviceStateQuery } from "./device-state.js";
+
+const queryDeviceState = createDeviceStateQuery();
 
 const ALLOW_WRITE = process.env.ALEXA_MCP_ALLOW_WRITE === "1";
 
@@ -333,16 +336,16 @@ server.registerTool(
   "alexa_query_device",
   {
     title: "Query smart-home device state",
-    description: "Live state of smart-home devices/groups by applianceId (or entityId).",
+    description: "Live state of smart-home devices/groups by applianceId (or entityId). Can be rate limited by Amazon; do not retry immediately on errors. Prefer inventory tools when live state is unnecessary.",
     inputSchema: { applianceIds: z.array(z.string().min(1).max(512)).min(1).max(100), entityType: z.enum(["APPLIANCE", "GROUP"]).optional() },
   },
   async ({ applianceIds, entityType }) => {
     try {
       const alexa = await getAlexa();
-      const res = entityType
-        ? await call((cb) => (alexa as any).querySmarthomeDevices(applianceIds, entityType, cb))
-        : await call((cb) => (alexa as any).querySmarthomeDevices(applianceIds, cb));
-      return ok(res);
+      // v8.1.1 supports the explicit (ids, type, maxTimeout, callback) overload.
+      // The library may internally retry; the wrapper bounds MCP waiting.
+      return await queryDeviceState(cb =>
+        (alexa as any).querySmarthomeDevices(applianceIds, entityType ?? "APPLIANCE", 15_000, cb));
     } catch (e: any) { return fail(hint(e)); }
   },
 );
