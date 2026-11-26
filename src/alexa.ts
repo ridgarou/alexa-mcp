@@ -32,7 +32,7 @@ export function defaultConfig(): AlexaConfig {
     acceptLanguage: process.env.ALEXA_MCP_ACCEPT_LANGUAGE ?? "de-DE",
     proxyOwnIp: process.env.ALEXA_MCP_PROXY_IP ?? "127.0.0.1",
     proxyPort: Number(process.env.ALEXA_MCP_PROXY_PORT ?? 3456),
-    proxyListenBind: process.env.ALEXA_MCP_PROXY_BIND ?? "0.0.0.0",
+    proxyListenBind: process.env.ALEXA_MCP_PROXY_BIND ?? "127.0.0.1",
     cookieRefreshIntervalMs: Number(
       process.env.ALEXA_MCP_REFRESH_MS ?? 4 * 24 * 60 * 60 * 1000, // 4 days
     ),
@@ -117,7 +117,7 @@ export function initAlexa(
         amazonPage: cfg.amazonPage,
         acceptLanguage: cfg.acceptLanguage,
         amazonPageProxyLanguage:
-          process.env.ALEXA_MCP_PROXY_LANGUAGE ??
+          process.env.ALEXA_MCP_PROXY_LANGUAGE ||
           cfg.acceptLanguage.replace(/-/g, "_"),
         usePushConnection: cfg.usePushConnection,
         cookieRefreshInterval: cfg.cookieRefreshIntervalMs,
