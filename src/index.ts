@@ -599,7 +599,7 @@ if (ALLOW_WRITE) {
     triggerDays: z.array(z.string()).optional(),
     triggerTimeZone: z.string().optional(),
     actions: z
-      .array(z.object({ type: z.string(), operationPayload: z.record(z.any()) }))
+      .array(z.object({ type: z.string(), operationPayload: z.record(z.string(), z.any()) }))
       .min(1),
     status: z.enum(["ENABLED", "DISABLED"]).optional(),
     dryRun: z.boolean().optional(),
