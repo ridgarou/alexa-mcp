@@ -16,10 +16,12 @@ Docker configuration.
 > **Versioning:** this fork follows independent [Semantic Versioning](https://semver.org/),
 > starting at `1.0.0-rc.1`. The current published candidate is `1.0.0-rc.2`.
 > Previous images remain available under their original names.
-> This is not a stable release. The maintainer confirmed public package visibility; anonymous pulls must
-> still be verified before use; live Amazon authentication, refresh and host-specific
-> network controls still require validation. Do not replace a working production
-> deployment yet. See [CHANGELOG.md](CHANGELOG.md).
+> The current published image is still a release candidate. The maintainer
+> confirmed RC.2 anonymous pull, supervised inventory and natural renewal.
+> The 1.0.0 source is prepared for review, not published. Egress controls and
+> a restricted agent gateway remain separate requirements. Do not replace
+> a working deployment before validating the actual new digest. See
+> [CHANGELOG.md](CHANGELOG.md) and [stable acceptance](docs/STABLE_ACCEPTANCE.md).
 >
 > This project is not affiliated with or supported by Amazon. It uses
 > undocumented APIs that can change without notice, and its use may be
@@ -486,7 +488,8 @@ settings unchanged for normal operation.
   writer at a time. Local credential access and session refresh still
   carry account-level privileges.
 - A dedicated bridge is **not** an outbound allowlist. Egress enforcement,
-  real account validation and a restricted agent gateway are pending.
+  a restricted agent gateway and additional host isolation remain pending.
+  Supervised RC.2 inventory and natural renewal are documented separately.
 - Read-only MCP tools do not make the Amazon credential itself read-only.
   Some read queries use POST. See [READ_ONLY_AUDIT.md](docs/READ_ONLY_AUDIT.md).
 - Responses may contain private device information, voice history,
@@ -499,7 +502,11 @@ settings unchanged for normal operation.
 
 ## Stable release preparation
 
-The current published image is RC.2. The 1.0.0 source preparation is not a published stable release. See [stable acceptance](docs/STABLE_ACCEPTANCE.md) for live evidence, pending checks and the manual publication gate.
+The current published image is RC.2. The 1.0.0 source has the matching
+version metadata and completed live acceptance record. Review, authorized
+promotion and explicit manual publication are still required. A fresh
+validated image must be built; RC.2 must not be retagged as stable. See
+[stable acceptance](docs/STABLE_ACCEPTANCE.md) for evidence and limitations.
 
 ## Known limitations
 

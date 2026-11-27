@@ -1,6 +1,6 @@
 {
-  "approvedVersion": null,
-  "renewalVerified": false,
+  "approvedVersion": "1.0.0",
+  "renewalVerified": true,
   "anonymousPullVerified": true,
   "residualRisksAccepted": true
 }

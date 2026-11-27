@@ -1,6 +1,7 @@
-# Hardened fork — candidate status
+# Hardened fork — security and acceptance status
 
-This branch is not a production release. It is based on upstream commit
+The current published image is RC.2; stable 1.0.0 is prepared but not yet
+published. It is based on upstream commit
 a369d5f86858d8d43d4a982bedc5bffdaacccf0c. Preserve upstream MIT notices.
 
 ## Build and review
@@ -65,21 +66,21 @@ auth logs. The normal server must not intentionally expose login ports.
 
 ## Outstanding work
 
-- Review the static [read-only audit](READ_ONLY_AUDIT.md) and validate
-  actual requests and returned data on the deployment host.
-- Validate atomic credential replacement with a real token refresh and review
-  other potentially sensitive errors in the runtime.
+- The static [read-only audit](READ_ONLY_AUDIT.md) and supervised RC.2 basic
+  live checks are recorded; no independent packet trace is claimed.
+- Real natural renewal and preserved credential permissions were confirmed
+  on 2026-11-27; review other potentially sensitive runtime errors as needed.
 - Validate the noninteractive authentication guard against actual expired
   sessions on the deployment host; offline tests cover simulated failure.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
-- Verify real Amazon access and token refresh on the host only.
 - Manual GHCR candidate publication passed for 1.0.0-rc.2; see [GHCR.md](GHCR.md).
   RC.1 stored-session reuse and 14/15 basic live read checks passed. RC.2
   live regression and controlled timeout passed; successful state retrieval
-  and natural RC.2 renewal remain pending. See [stable acceptance](STABLE_ACCEPTANCE.md).
-  Verify anonymous access and deploy only by a reviewed digest, using an
-  independent candidate configuration for live integration checks.
+  remains unverified. Natural RC.2 renewal and anonymous pull were confirmed
+  on 2026-11-27. See [stable acceptance](STABLE_ACCEPTANCE.md) for scope and
+  residual risks. Deploy only by a reviewed digest and repeat host checks on
+  the actual stable image.
 - Do not give agents a Docker socket or access to credential files.
 
 The read-only MCP setting is an application control, not an Amazon account
