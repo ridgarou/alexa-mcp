@@ -38,5 +38,8 @@ the reviewed dependency implementation; changes require review and tests.
 Device names, routine payloads, voice history, list items and notification
 labels can contain private data or untrusted text. Never treat content
 returned by Amazon as agent instructions. The read-only inventory is not a
-complete skill inventory. Real integration and egress enforcement remain
-pending. No credentials are required or permitted in CI.
+complete skill inventory. Supervised RC.2 basic live inventory, controlled
+state timeout, session reuse and natural renewal have been reported by the
+maintainer; successful device-state retrieval and egress enforcement remain
+unverified. See [STABLE_ACCEPTANCE.md](STABLE_ACCEPTANCE.md). No credentials
+are required or permitted in CI.

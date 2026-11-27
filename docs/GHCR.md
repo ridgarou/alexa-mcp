@@ -1,4 +1,4 @@
-# GHCR candidate publication
+# GHCR release publication
 
 ## Published candidates
 
@@ -9,7 +9,7 @@
 - Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.2`.
 - Image: `ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810`.
 - All offline validation and the registry push passed, including authenticated manifest inspection.
-- Anonymous pull and live host acceptance of RC.2 remain pending.
+- Host image identity, offline checks and 14/15 basic live checks passed. The state query returned a controlled timeout and a subsequent inventory call passed. Anonymous pull and natural RC.2 renewal were confirmed by the maintainer on 2026-11-27; successful state retrieval remains unverified. See [STABLE_ACCEPTANCE.md](STABLE_ACCEPTANCE.md) for scope and cache limitations.
 
 ### 1.0.0-rc.1 (previous candidate)
 
@@ -18,7 +18,7 @@
 - Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0-rc.1`.
 - Image: `ghcr.io/ridgarou/alexa-mcp@sha256:bfb28bc6e411df717d45c2f1f595cec30e7b0b41ff71ef909128b1a7b7e7d80d`.
 - All validation and the registry push passed, including authenticated manifest inspection.
-- Image inspection and host offline tests passed. Stored-session reuse and 14/15 read tools passed basic live checks; device-state throttling led to RC.2. Anonymous pull was not independently confirmed; real renewal remains pending.
+- Image inspection and host offline tests passed. Stored-session reuse and 14/15 read tools passed basic live checks; device-state throttling led to RC.2. At publication, anonymous pull and real renewal were not yet confirmed; see subsequent RC.2 acceptance evidence.
 
 ### Historical candidate
 
@@ -29,7 +29,7 @@
 - Registry push and authenticated inspection passed. The maintainer confirmed public package visibility;
   anonymous access still requires verification.
 
-This workflow distributes a release candidate, not a production-ready image.
+The manual workflow supports release candidates and stable versions. Stable publication requires reviewed live acceptance and explicit approval; current published RC.2 is not stable.
 There is no push, PR, schedule, release or tag trigger for publication.
 
 ## Before publication
@@ -44,9 +44,13 @@ There is no push, PR, schedule, release or tag trigger for publication.
 
 ## Publish once, manually
 
-On GitHub, open Actions > Publish validated candidate (manual) > Run workflow.
-Select main, enter the exact package version (for example 1.0.0-rc.2),
-and explicitly enable confirm_publish. This workflow cannot publish from
+On GitHub, open Actions > Publish validated image (manual) > Run workflow.
+Select main, enter the exact package version, and explicitly enable confirm_publish.
+For stable versions also enable confirm_stable_acceptance only after the
+version-specific [acceptance record](STABLE_ACCEPTANCE.md) has been reviewed
+and merged with all required checks approved. The workflow blocks stable
+publication unless docs/stable-acceptance.json matches the requested version
+and its three approval fields are true. This workflow cannot publish from
 a feature branch or a pull request.
 
 The single standard amd64 runner executes the same local composite validation
@@ -56,19 +60,26 @@ prevent publication. The validated local image is then pushed without rebuilding
 Only the publishing job receives packages:write and the temporary GitHub token
 is passed to docker login over stdin only at the final step. No deployment occurs.
 
-New tags use the exact independent SemVer candidate version (for example
-1.0.0-rc.2). The workflow rejects an existing tag and checks the version
+New tags use the exact independent SemVer version (e.g. 1.0.0 or
+1.1.0-rc.1). The workflow rejects an existing tag and checks the version
 against package.json. No latest tag is created. The workflow summary shows
-the immutable registry digest. Use the next RC number for a new build.
-Stable promotion is a separate, deliberately controlled operation after
-live testing; the candidate workflow cannot publish stable versions.
+the immutable registry digest. Use a new SemVer version for any replacement
+build of an already published version; use the next RC number for another
+candidate in the same release series.
+Stable promotion requires the separate acceptance approval described above
+and a fresh build with matching embedded version. No automatic promotion.
 
 ## First publication and visibility
 
 A new GHCR package may be private initially even if the repository is public.
 Review the package's settings after the first push, associate it with this
 repository if necessary and change visibility to public only when intended.
-Verify anonymous access before deploying. Container registry storage and
+Verify anonymous access before deploying. A pull using a temporary empty
+Docker client configuration with cached layers satisfies the current RC.2
+acceptance criterion; it does not prove a fresh transfer of every layer.
+For the actual published stable digest, a clean disposable environment is
+recommended for an additional cold-cache pull; keep existing rollback
+images. Container registry storage and
 bandwidth are currently free according to GitHub's billing documentation;
 review the policy before publishing future versions. Public packages can be
 pulled without a PAT.
@@ -80,9 +91,10 @@ Use the exact digest from the successful workflow summary in the local .env:
     ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:<reviewed-digest>
 
 Do not use latest or a mutable tag as the deployment identity. Keep the
-previous deployed digest for rollback. Validate with the actual host,
-credentials, refresh behavior and egress controls before treating this
-candidate as stable. No Watchtower update or automatic deployment is enabled.
+previous deployed digest for rollback. Repeat supervised host smoke and
+regression checks on the actual stable digest. Natural RC.2 renewal is
+candidate evidence, not proof of the new image's behavior. Egress controls
+and a restricted gateway are separate prerequisites for untrusted agents. No Watchtower update or automatic deployment is enabled.
 
 Keep only useful published candidates and releases. Remove obsolete GHCR
 versions manually after verifying that neither the current deployment nor
