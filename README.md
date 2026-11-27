@@ -501,6 +501,14 @@ settings unchanged for normal operation.
 - Authentication logs are suppressed and the Compose logging driver is
   disabled; no real account data belongs in GitHub Actions or issue reports.
 
+## Experimental egress component
+
+See [egress/README.md](egress/README.md) for the separate guarded Squid
+component, installation prerequisites, threat model and acceptance tests.
+The provisional baseline is published 1.0.1-rc.1. Prior manager supervised
+host inventory and closure passed; new supervisor acceptance and natural
+renewal remain pending. No stable egress release or autonomous access.
+
 ## Unreleased lifecycle correction
 
 The published 1.0.0 image passed guarded inventory, but a supervised session

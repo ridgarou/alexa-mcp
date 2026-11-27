@@ -1,0 +1,144 @@
+name: Egress isolation validation
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'egress/**'
+      - '.github/workflows/egress-validation.yml'
+      - 'Dockerfile'
+      - 'src/**'
+      - 'package*.json'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'egress/**'
+      - '.github/workflows/egress-validation.yml'
+      - 'Dockerfile'
+      - 'src/**'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: egress-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  guarded-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Static policy tests
+        run: |
+          python3 -m unittest discover -s egress -p 'test_*.py' -v
+          python3 -m py_compile egress/run.py egress/policy.py egress/install.py egress/supervisor.py egress/test_lifecycle.py
+          sh -n egress/alexa-egress-manager
+          node --check egress/probe.mjs
+          node --check egress/readiness.mjs
+      - name: Pull and verify published application candidate
+        run: |
+          set -euo pipefail
+          APP_REF="$(sed -n 's/^ALEXA_MCP_IMAGE=//p' egress/.env.example)"
+          test "$APP_REF" = 'ghcr.io/ridgarou/alexa-mcp@sha256:538273eb99b540d597b5e9d318a3132f17a245e3553f1fe57b402ceced304707'
+          DOCKER_CONFIG="$(mktemp -d)"
+          export DOCKER_CONFIG
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          docker --host unix:///var/run/docker.sock pull --platform linux/amd64 "$APP_REF"
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$APP_REF")" = '1.0.1-rc.1'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$APP_REF")" = '5943f0a4f91e9b12e4300506528d9409091bbbfe'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{.Os}}/{{.Architecture}}' "$APP_REF")" = 'linux/amd64'
+          docker --host unix:///var/run/docker.sock image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$APP_REF" | grep -Fx "$APP_REF"
+          echo 'CANDIDATE_IMAGE_IDENTITY: PASS'
+      - name: Build proxy
+        run: |
+          docker build --pull --platform linux/amd64 -t local/alexa-egress:test egress
+      - name: Verify isolation on ephemeral Linux runner
+        run: |
+          set -euo pipefail
+          if ! command -v nft >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends nftables
+          fi
+          APP="$(sed -n 's/^ALEXA_MCP_IMAGE=//p' egress/.env.example)"
+          PROXY="$(docker image inspect --format '{{.Id}}' local/alexa-egress:test)"
+          UPLINK="$(ip -j -4 route get 1.1.1.1 | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["dev"])')"
+          sudo install -d -m 0700 /root/alexa-egress-ci
+          sudo cp -a egress/. /root/alexa-egress-ci/
+          sudo chown -R root:root /root/alexa-egress-ci
+          sudo chmod -R go-w /root/alexa-egress-ci
+          # Hosted runners may have a developer-writable /opt. Normalize ONLY
+          # this ephemeral test runner, never a deployment host.
+          sudo test -d /opt
+          sudo test ! -L /opt
+          sudo chown root:root /opt
+          sudo chmod 0755 /opt
+          # Reproduce a root-owned, non-writable setgid stack parent.
+          sudo test ! -e /opt/containers-data
+          sudo install -d -o root -g users -m 2775 /opt/containers-data
+          if sudo python3 -I -B /root/alexa-egress-ci/install.py; then
+            echo 'Unexpected acceptance of writable ancestor'; exit 1
+          fi
+          sudo test ! -e /opt/alexa-egress-manager
+          sudo test ! -e /etc/alexa-egress-manager
+          sudo test ! -e /opt/containers-data/AlexaEgress
+          sudo test ! -e /usr/local/sbin/alexa-egress-manager
+          sudo chmod 2755 /opt/containers-data
+          PARENT_BEFORE="$(sudo stat -c '%a:%u:%g' /opt/containers-data)"
+          sudo python3 -I -B /root/alexa-egress-ci/install.py
+          test "$(sudo stat -c '%a:%u:%g' /opt/containers-data)" = "$PARENT_BEFORE"
+          for DIR in /opt/alexa-egress-manager /etc/alexa-egress-manager /opt/containers-data/AlexaEgress; do
+            test "$(sudo stat -c '%a:%u:%g' "$DIR")" = '700:0:0'
+          done
+          test "$(sudo stat -c '%a:%u:%g' /usr/local/sbin/alexa-egress-manager)" = '755:0:0'
+          test "$(sudo stat -c '%a:%u:%g' /opt/containers-data/AlexaEgress/AlexaEgress.yml)" = '644:0:0'
+          if sudo python3 -I -B /root/alexa-egress-ci/install.py; then
+            echo 'Unexpected overwrite permission'; exit 1
+          fi
+          sudo test -f /opt/containers-data/AlexaEgress/AlexaEgress.yml
+          sudo test -f /opt/alexa-egress-manager/run.py
+          sudo test "$(sudo stat -c '%a:%u:%g' /etc/alexa-egress-manager)" = '700:0:0'
+          sed -e "s|^ALEXA_MCP_IMAGE=.*|ALEXA_MCP_IMAGE=$APP|" \
+              -e "s|^ALEXA_EGRESS_IMAGE=.*|ALEXA_EGRESS_IMAGE=$PROXY|" \
+              -e "s|^ALEXA_EGRESS_UPLINK=.*|ALEXA_EGRESS_UPLINK=$UPLINK|" \
+              egress/.env.example | sudo tee /etc/alexa-egress-manager/.env >/dev/null
+          sudo chmod 600 /etc/alexa-egress-manager/.env
+          sudo /usr/local/sbin/alexa-egress-manager check --diagnostics
+          test -z "$(docker ps -aq --filter label=com.docker.compose.project=alexa-egress)"
+          test -z "$(docker network ls -q --filter label=com.docker.compose.project=alexa-egress)"
+          if sudo nft list table inet alexa_guard >/dev/null 2>&1; then
+            echo "Guard table unexpectedly remains after successful cleanup"
+            exit 1
+          fi
+          sudo python3 -I -B /root/alexa-egress-ci/test_lifecycle.py
+      - name: Scan proxy runtime
+        if: always() && !cancelled()
+        run: |
+          docker save -o /tmp/alexa-egress.tar local/alexa-egress:test
+          chmod 0644 /tmp/alexa-egress.tar
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges:true \
+            -v /tmp/alexa-egress.tar:/scan/image.tar:ro \
+            aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
+            image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL \
+            --format json --timeout 10m > /tmp/egress-trivy.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("/tmp/egress-trivy.json")).get("Results") or []
+          if not any(x.get("Class")=="os-pkgs" for x in r):
+              raise SystemExit("Missing proxy OS scan")
+          findings=[v for x in r for v in x.get("Vulnerabilities") or []]
+          high=sum(v.get("Severity")=="HIGH" for v in findings)
+          critical=sum(v.get("Severity")=="CRITICAL" for v in findings)
+          fixable=sum(bool(v.get("FixedVersion")) for v in findings)
+          print(f"Proxy High: {high}; Critical: {critical}; Fixable: {fixable}")
+          if critical or fixable:
+              raise SystemExit("Proxy security gate failed")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: egress-trivy-report
+          path: /tmp/egress-trivy.json
+          retention-days: 7
+          if-no-files-found: ignore

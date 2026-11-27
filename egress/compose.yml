@@ -1,0 +1,105 @@
+# Dedicated project; do not merge with the normal or interactive-auth Compose.
+# Containers start only as inert placeholders; the privileged host launcher
+# installs and verifies policy before executing the actual programs.
+name: alexa-egress
+services:
+  AlexaMCP:
+    image: ${ALEXA_MCP_IMAGE:?Reviewed application image required}
+    pull_policy: never
+    entrypoint: ["/bin/sleep", "infinity"]
+    command: []
+    user: "1000:1000"
+    init: true
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 384m
+    environment:
+      NODE_ENV: production
+      NODE_USE_ENV_PROXY: "1"
+      HTTPS_PROXY: "http://${ALEXA_PROXY_PRIVATE_IP:?}:3128"
+      HTTP_PROXY: "http://${ALEXA_PROXY_PRIVATE_IP:?}:3128"
+      https_proxy: "http://${ALEXA_PROXY_PRIVATE_IP:?}:3128"
+      http_proxy: "http://${ALEXA_PROXY_PRIVATE_IP:?}:3128"
+      NO_PROXY: ""
+      no_proxy: ""
+      ALEXA_MCP_AMAZON_PAGE: "${ALEXA_MCP_AMAZON_PAGE:-amazon.es}"
+      ALEXA_MCP_ACCEPT_LANGUAGE: "${ALEXA_MCP_ACCEPT_LANGUAGE:-es-ES}"
+      ALEXA_MCP_PROXY_LANGUAGE: "${ALEXA_MCP_PROXY_LANGUAGE:-es_ES}"
+      ALEXA_MCP_ALLOW_WRITE: "0"
+      ALEXA_MCP_AUTH_PATH: /app/.auth/alexa.json
+      ALEXA_MCP_PROXY_IP: 127.0.0.1
+      ALEXA_MCP_PROXY_PORT: "3456"
+      ALEXA_MCP_PROXY_BIND: 127.0.0.1
+      ALEXA_MCP_WS_MQTT: "false"
+    volumes:
+      - type: bind
+        source: ${ALEXA_MCP_AUTH_DIR:?}
+        target: /app/.auth
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    logging: {driver: "none"}
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    networks:
+      private:
+        ipv4_address: ${ALEXA_MCP_PRIVATE_IP:?}
+  AlexaEgress:
+    image: ${ALEXA_EGRESS_IMAGE:?Reviewed proxy image required}
+    pull_policy: never
+    entrypoint: ["/bin/sleep", "infinity"]
+    command: []
+    user: proxy
+    init: true
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    volumes:
+      - type: bind
+        source: ${ALEXA_EGRESS_CONFIG_DIR:?Launcher-generated configuration required}
+        target: /etc/alexa-egress
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+      - /run:rw,noexec,nosuid,nodev,size=8m
+    logging: {driver: "none"}
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    networks:
+      private:
+        ipv4_address: ${ALEXA_PROXY_PRIVATE_IP:?}
+      outbound:
+        ipv4_address: ${ALEXA_PROXY_EGRESS_IP:?}
+        gw_priority: 1
+networks:
+  private:
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-alexa-priv
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    ipam:
+      config:
+        - subnet: ${ALEXA_PRIVATE_SUBNET:?}
+  outbound:
+    driver: bridge
+    internal: false
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-alexa-egress
+    ipam:
+      config:
+        - subnet: ${ALEXA_EGRESS_SUBNET:?}
+          gateway: ${ALEXA_EGRESS_GATEWAY:?}

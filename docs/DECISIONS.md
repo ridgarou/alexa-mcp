@@ -321,6 +321,63 @@ the stable 1.0.1 release; do not mark the 1.0.0 acceptance record as
 approval of a different version. Keep 1.0.0 as rollback. Reconcile the
 separate Egress draft after the correction; allocate its ADR number then.
 
+## ADR-013 — Separate guarded egress component
+
+**Date:** 2026-11-27 · **Status:** Implementation draft; stable application
+baseline revised to the published shutdown-fix RC; new supervisor acceptance pending.
+
+Use a self-contained egress/ folder and README, separate Compose project
+rather than an override, Squid CONNECT without TLS interception, exact
+Spain allowlist, and root-controlled on-demand launcher. Add temporary
+host nftables table and default-deny network namespace rules before
+starting real processes. This refines the earlier iptables-chain and
+persistent-service design: nft transactions keep our rules separate from
+Docker/Netavark and namespace rules block embedded DNS before DNAT.
+No permanent systemd service is necessary when containers cannot restart
+automatically and each guarded session reapplies policy. Review cleanup,
+fail-closed behavior, DNS, scope and limitations in egress/THREAT_MODEL.md.
+
+The maintainer approved separate host manager, system configuration and Docker
+stack directories. Install code at /opt/alexa-egress-manager, configuration at
+/etc/alexa-egress-manager, Docker files at /opt/containers-data/AlexaEgress,
+temporary state at /run/alexa-egress-manager, and a fixed root-only command
+at /usr/local/sbin/alexa-egress-manager. All three installation directories
+must be root-controlled; refuse unsafe ancestors or existing destinations.
+New directories are normalized to root:root without changing existing
+ancestors. No changes to account credentials or existing stack files.
+
+The initial guarded baseline was published 1.0.0. After its live EOF
+failure, use the published 1.0.1-rc.1 digest as the provisional baseline.
+Do not confuse it with stable acceptance; switch to a reviewed 1.0.1
+stable digest after the separate publication gate. CI isolation checks pull and verify this exact artifact
+anonymously, build the local Squid image, and test the actual installer
+and installed entrypoint on an ephemeral runner. The existing shared
+application CI continues to validate the current source build. A future
+change of application baseline requires explicit digest and compatibility
+review. Keep the stable application version unchanged during this
+reconciliation; decide the next release version separately before
+promotion or publication. Never republish 1.0.0.
+
+Bound the manager independently of application cleanup. Relay stdin with
+at most 64 KiB buffered and a 15-second deadline once EOF/HUP is observed.
+Poll attached exec processes every 250 ms; proxy exit or output disconnect
+fails the session. Stop/remove the project and verify containers, networks
+and bridge absence before deleting only its guard table. Defer repeated
+signals during bounded cleanup and preserve guard on uncertainty. Failures
+return nonzero, including stuck child, proxy exit and interrupted session.
+Use fixed synthetic check-only fixtures and disposable-runner fault tests.
+This is not a continuous policy integrity monitor or proof of proxy health.
+
+**Rationale:** preserve the accepted stable application while testing
+the independent network enforcement layer against the actual artifact.
+
+**Acceptance:** prior draft CI passed, but the reconciled branch requires
+fresh CI, synthetic host checks, supervised positive TLS and live inventory
+and natural renewal through the guarded path, interruption/recovery tests
+and resource review. No deployment, stable egress release, or autonomous
+agent access is authorized by reconciliation. Remaining stable-image
+renewal observation does not block independent egress development.
+
 ## How to update this record
 
 Use the next ADR number. Include date, status, context, decision, rationale,
