@@ -89,7 +89,9 @@ export function createAlexaRemote(interactive: boolean): AlexaRemote {
 export function initAlexa(
   cfg: AlexaConfig = defaultConfig(),
   interactive = false,
+  signal?: AbortSignal,
 ): Promise<InitResult> {
+  if (signal?.aborted) return Promise.reject(new Error("MCP session closing."));
   const stored = loadAuth();
 
   if (!stored && !interactive) {
@@ -101,6 +103,31 @@ export function initAlexa(
   }
 
   const alexa = createAlexaRemote(interactive);
+
+  // The MCP session owns the remote from creation, not only after init resolves.
+  // Keep the cookie listener: a refresh already in flight may still complete,
+  // and its synchronous atomic persistence must not be discarded on EOF.
+  const stop = () => {
+    try {
+      alexa.stop();
+    } catch {
+      console.error("[alexa] Stop failed. Details suppressed.");
+      process.exitCode = 1;
+    }
+  };
+
+  // Internal refresh/auth fallback may call init again. Refuse new init calls
+  // after cancellation, without changing the configured refresh interval.
+  if (signal) {
+    const originalInit = alexa.init.bind(alexa);
+    alexa.init = (options, callback) => {
+      if (signal.aborted) {
+        callback(new Error("MCP session closing."));
+        return;
+      }
+      return originalInit(options, callback);
+    };
+  }
 
   // Write the token back on every refresh/login.
   // The 'cookie' event fires on the first login AND on every 4-day refresh
@@ -120,8 +147,21 @@ export function initAlexa(
     // on every automatic refresh (default every 4 days) — hence the settled
     // guard (resolve the promise only once).
     let settled = false;
+    const onAbort = () => {
+      stop();
+      if (!settled) {
+        settled = true;
+        reject(new Error("MCP session closing."));
+      }
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
 
-    alexa.init(
+    try {
+      alexa.init(
       {
         // Replay the persisted registration (no login needed).
         // setCookie() accepts the full object as `cookie`.
@@ -144,6 +184,12 @@ export function initAlexa(
         cookieRefreshInterval: cfg.cookieRefreshIntervalMs,
       } as any,
       (err?: Error) => {
+        if (signal?.aborted) {
+          // A callback already in flight can arm a timer after the first stop.
+          // Cancel it again; upstream does not expose request cancellation.
+          stop();
+          return;
+        }
         if (settled) {
           // Re-fired by the refresh timer: just log; the promise is long resolved.
           if (err) (cfg.logger ?? console.error)("[alexa] Refresh failed. Details suppressed.");
@@ -162,6 +208,8 @@ export function initAlexa(
         }
         settled = true;
         if (err) {
+          signal?.removeEventListener("abort", onAbort);
+          stop();
           if (!interactive && (err.message === RELOGIN_REQUIRED || isProxyPrompt(err))) {
             reject(new Error(RELOGIN_REQUIRED));
           } else {
@@ -171,6 +219,14 @@ export function initAlexa(
         }
         resolvePromise({ alexa, fromStoredToken: !!stored });
       },
-    );
+      );
+    } catch {
+      signal?.removeEventListener("abort", onAbort);
+      stop();
+      if (!settled) {
+        settled = true;
+        reject(new Error("Alexa initialization failed. Details suppressed."));
+      }
+    }
   });
 }
