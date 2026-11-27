@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fixed root-controlled interpreter and module paths; no caller Python imports.
+set -eu
+[ "$(/usr/bin/id -u)" -eq 0 ] || { echo "Run as root" >&2; exit 1; }
+exec /usr/bin/python3 -I -B -c 'import sys, runpy; sys.path.insert(0, "/opt/alexa-egress-manager"); runpy.run_path("/opt/alexa-egress-manager/run.py", run_name="__main__")' "$@"

@@ -275,3 +275,14 @@ Superseded by the new ADR, retaining history. Distinguish maintainer-approved
 requirements, engineering choices, and unimplemented proposals. Never
 include actual credentials, private host addresses, device inventories
 or account data in this public repository.
+
+## Egress manager installation layout (implementation draft)
+
+The maintainer approved separate host manager, system configuration and Docker
+stack directories. Install code at /opt/alexa-egress-manager, configuration at
+/etc/alexa-egress-manager, Docker files at /opt/containers-data/AlexaEgress,
+temporary state at /run/alexa-egress-manager, and a fixed root-only command
+at /usr/local/sbin/alexa-egress-manager. All three installation directories
+must be root-controlled; refuse unsafe ancestors or existing destinations.
+No change to the network policy, account credentials or existing stack files.
+Validate the actual installer and installed entrypoint in CI before host use.

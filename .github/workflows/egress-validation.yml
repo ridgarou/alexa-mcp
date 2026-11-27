@@ -33,7 +33,8 @@ jobs:
       - name: Static policy tests
         run: |
           python3 -m unittest discover -s egress -p 'test_*.py' -v
-          python3 -m py_compile egress/run.py egress/policy.py
+          python3 -m py_compile egress/run.py egress/policy.py egress/install.py
+          sh -n egress/alexa-egress-manager
           node --check egress/probe.mjs
           node --check egress/readiness.mjs
       - name: Build application and proxy
@@ -53,12 +54,20 @@ jobs:
           sudo install -d -m 0700 /root/alexa-egress-ci
           sudo cp -a egress/. /root/alexa-egress-ci/
           sudo chown -R root:root /root/alexa-egress-ci
+          sudo chmod -R go-w /root/alexa-egress-ci
+          sudo python3 -I -B /root/alexa-egress-ci/install.py
+          if sudo python3 -I -B /root/alexa-egress-ci/install.py; then
+            echo 'Unexpected overwrite permission'; exit 1
+          fi
+          sudo test -f /opt/containers-data/AlexaEgress/AlexaEgress.yml
+          sudo test -f /opt/alexa-egress-manager/run.py
+          sudo test "$(sudo stat -c '%a:%u:%g' /etc/alexa-egress-manager)" = '700:0:0'
           sed -e "s|^ALEXA_MCP_IMAGE=.*|ALEXA_MCP_IMAGE=$APP|" \
               -e "s|^ALEXA_EGRESS_IMAGE=.*|ALEXA_EGRESS_IMAGE=$PROXY|" \
               -e "s|^ALEXA_EGRESS_UPLINK=.*|ALEXA_EGRESS_UPLINK=$UPLINK|" \
-              egress/.env.example | sudo tee /root/alexa-egress-ci/.env >/dev/null
-          sudo chmod 600 /root/alexa-egress-ci/.env
-          sudo python3 -B /root/alexa-egress-ci/run.py check --diagnostics
+              egress/.env.example | sudo tee /etc/alexa-egress-manager/.env >/dev/null
+          sudo chmod 600 /etc/alexa-egress-manager/.env
+          sudo /usr/local/sbin/alexa-egress-manager check --diagnostics
           test -z "$(docker ps -aq --filter label=com.docker.compose.project=alexa-egress)"
           test -z "$(docker network ls -q --filter label=com.docker.compose.project=alexa-egress)"
           if sudo nft list table inet alexa_guard >/dev/null 2>&1; then

@@ -19,9 +19,11 @@ from policy import (TABLE, PRIVATE_BR, OUTBOUND_BR, BLOCKED, DNS,
                     host_policy, namespace_policy, validate_networks, validate_domains,
                     dns_denial_evidence)
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path("/opt/alexa-egress-manager")
+CONFIG = Path("/etc/alexa-egress-manager")
+STACK = Path("/opt/containers-data/AlexaEgress")
 PROJECT = "alexa-egress"
-STATE = Path("/run/alexa-egress")
+STATE = Path("/run/alexa-egress-manager")
 DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin",
        "HOME": "/root", "LANG": "C.UTF-8"}
@@ -46,15 +48,21 @@ def cmd(args, *, data=None, capture=True, timeout=60, env=None, check=True):
 def js(args):
     return json.loads(cmd(args).stdout)
 
+def trusted_directory(path):
+    for directory in (path, *path.parents):
+        st = directory.lstat()
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022:
+            raise RuntimeError("Untrusted directory or ancestor: " + str(directory))
+
 def trusted_file(path, private=False):
     st = path.lstat()
     if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_mode & (0o077 if private else 0o022):
         raise RuntimeError("Untrusted launcher/configuration file")
 
 def load_env():
-    trusted_file(ROOT / ".env", private=True)
+    trusted_file(CONFIG / ".env", private=True)
     env = {}
-    for raw in (ROOT / ".env").read_text().splitlines():
+    for raw in (CONFIG / ".env").read_text().splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -81,7 +89,7 @@ def addresses(env):
 
 def compose(env, args, **kw):
     return cmd(DOCKER + ["compose", "--project-name", PROJECT,
-        "--env-file", str(ROOT / ".env"), "-f", str(ROOT / "compose.yml")] + args,
+        "--env-file", str(CONFIG / ".env"), "-f", str(STACK / "AlexaEgress.yml")] + args,
         env={**ENV, **env}, **kw)
 
 def project_containers():
@@ -263,15 +271,19 @@ def main():
         parser.error("--diagnostics is restricted to synthetic check mode")
     if os.geteuid() != 0:
         raise RuntimeError("Run as root on the trusted Docker host")
-    for directory in (ROOT, *ROOT.parents):
-        st = directory.stat()
-        if st.st_uid != 0 or st.st_mode & 0o022:
-            raise RuntimeError("Launcher directory must be root controlled")
-    for name in ("run.py", "policy.py", "compose.yml", "squid.conf.template",
-                 "allowed-domains.txt", "probe.mjs", "readiness.mjs"):
+    for directory in (ROOT, CONFIG, STACK):
+        trusted_directory(directory)
+        if stat.S_IMODE(directory.stat().st_mode) != 0o700:
+            raise RuntimeError("Manager, configuration and stack directories must be mode 0700")
+    for name in ("run.py", "policy.py", "probe.mjs", "readiness.mjs"):
         trusted_file(ROOT / name)
+    for name in ("AlexaEgress.yml", "squid.conf.template", "allowed-domains.txt"):
+        trusted_file(STACK / name)
+    trusted_file(CONFIG / ".env", private=True)
+    trusted_directory(STATE.parent)
     STATE.mkdir(mode=0o700, exist_ok=True)
-    if STATE.is_symlink() or STATE.stat().st_uid != 0 or STATE.stat().st_mode & 0o077:
+    trusted_directory(STATE)
+    if stat.S_IMODE(STATE.stat().st_mode) != 0o700:
         raise RuntimeError("Unsafe runtime state directory")
     with contextlib.ExitStack() as stack:
         fd = os.open(STATE / "session.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -292,9 +304,9 @@ def main():
         # Config files are readable only inside the explicit read-only mount.
         config = temp / "config"
         config.mkdir(mode=0o755)
-        domains = validate_domains((ROOT / "allowed-domains.txt").read_text())
+        domains = validate_domains((STACK / "allowed-domains.txt").read_text())
         (config / "allowed-domains.txt").write_text("\n".join(domains) + "\n")
-        squid = (ROOT / "squid.conf.template").read_text()
+        squid = (STACK / "squid.conf.template").read_text()
         squid = squid.replace("@CLIENT_IP@", v["app"]).replace("@PROXY_IP@", v["proxy"])
         squid = squid.replace("@BLOCKED_IPV4@", " ".join(str(n) for n in ipaddress.collapse_addresses(ipaddress.IPv4Network(x) for x in (*BLOCKED, *extra))))
         if "@" in squid:

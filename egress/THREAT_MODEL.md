@@ -14,6 +14,9 @@ Squid image/config, DNS resolvers and Amazon endpoints are trusted.
 A hostile root, Docker administrator, mutable root code, kernel escape or
 compromised proxy is outside the isolation guarantee. Do not grant the
 launcher or Docker socket to agents. Keep the actual host topology private.
+The separately installed manager, its configuration and Docker stack files
+are all privileged trust inputs. Fixed paths and root-only directories are
+required; do not allow agents or privileged containers to modify them.
 
 ## Controls
 

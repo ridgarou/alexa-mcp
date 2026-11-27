@@ -35,6 +35,7 @@ capabilities, non-root users, no restart and bounded resources.
 - `squid.conf.template`: CONNECT-only policy, cache and access logs disabled.
 - `policy.py`: generates dedicated host and namespace nftables rules.
 - `run.py`: guarded launch, preflight, cleanup and session lock.
+- `install.py` and `alexa-egress-manager`: fresh root-controlled installation and fixed command entrypoint.
 - `readiness.mjs`, `probe.mjs`, `test_policy.py`: live negative probes and synthetic policy tests.
 - `.env.example`: generic example; keep the actual .env local.
 - [Threat model](THREAT_MODEL.md): trust boundaries and limitations.
@@ -64,30 +65,69 @@ updated Debian packages, so it is not bit-for-bit reproducible. The proxy
 is not yet published to GHCR. Pin the resulting local sha256 image ID;
 do not use a mutable tag in the launcher configuration.
 
-Install a reviewed copy of this folder in a root-controlled location (not
-an agent-writable checkout). For example, on a fresh install:
+## Install the manager and Docker stack
+
+The host manager is separate from the two Docker containers. Its fixed
+installation layout is:
+
+| Path | Purpose |
+| --- | --- |
+| `/opt/alexa-egress-manager/` | Python manager and Node diagnostic probes |
+| `/etc/alexa-egress-manager/` | Local .env and configuration example |
+| `/opt/containers-data/AlexaEgress/` | Dockerfile, AlexaEgress.yml, Squid policy and documentation |
+| `/usr/local/sbin/alexa-egress-manager` | Root-only administration command |
+| `/run/alexa-egress-manager/` | Session lock and generated temporary configuration |
+
+All three installation directories are root:root, mode 0700; all their
+ancestors must be root-owned, non-symlink directories with no group/other
+write permission. The local .env must be root-owned mode 0600. Do not mount
+these paths writable into Codex, Hermes or another agent; container UID 0
+or Docker API access can defeat ordinary filesystem permissions.
+
+Before installation, inspect the existing parent with
+`namei -l /opt/containers-data`. If it is not root controlled, stop.
+Do not recursively change ownership or permissions of existing stacks.
+
+From a reviewed, pinned checkout, prepare a new staging directory and copy
+only reviewed files. Do not execute unreviewed code as root.
 
 ```sh
-sudo install -d -m 0700 /opt/alexa-egress
-sudo cp -a egress/. /opt/alexa-egress/
-sudo chown -R root:root /opt/alexa-egress
-sudo chmod -R go-w /opt/alexa-egress
-sudo cp /opt/alexa-egress/.env.example /opt/alexa-egress/.env
-sudo chmod 600 /opt/alexa-egress/.env
-sudoedit /opt/alexa-egress/.env
+sudo test ! -e /opt/alexa-egress-staging
+sudo install -d -m 0700 /opt/alexa-egress-staging
+sudo cp -a egress/. /opt/alexa-egress-staging/
+sudo chown -R root:root /opt/alexa-egress-staging
+sudo chmod -R go-w /opt/alexa-egress-staging
+sudo /usr/bin/python3 -I -B /opt/alexa-egress-staging/install.py
 ```
 
-Do not overwrite an existing deployment or .env when updating.
+The installer refuses existing destinations, including the previous
+experimental layout and runtime directory. It does not modify Docker,
+the firewall, credentials, other stacks or existing configuration.
+It installs only an explicit file list, never a local .env from source.
+The command uses an isolated Python interpreter and fixed paths.
+After successful installation remove the reviewed staging copy.
+
+Create the configuration separately (fresh installation only):
+
+```sh
+sudo test ! -e /etc/alexa-egress-manager/.env
+sudo install -m 0600 /etc/alexa-egress-manager/.env.example /etc/alexa-egress-manager/.env
+sudoedit /etc/alexa-egress-manager/.env
+```
+
 Set the reviewed app digest (the example uses RC.2 pending stable release),
 proxy image ID, selected physical uplink, auth directory and disjoint
 IPv4 networks. Check existing Docker/Podman subnets and all host routes.
 The launcher rejects overlaps. The Spain-specific locale and exact
 allowlist are intentionally narrow. No credentials in .env or Git.
+An installed Dockerfile can also be built with
+`sudo docker build --pull -t local/alexa-egress:reviewed /opt/containers-data/AlexaEgress`;
+scan the resulting image before configuring its immutable ID.
 
 ## Check without accessing the Amazon account
 
 ```sh
-sudo python3 -B /opt/alexa-egress/run.py check
+sudo /usr/local/sbin/alexa-egress-manager check
 ```
 
 This uses an empty synthetic auth directory, not your actual session.
@@ -102,7 +142,7 @@ Optional positive test (one unauthenticated HTTPS request with verified TLS,
 not an account login):
 
 ```sh
-sudo python3 -B /opt/alexa-egress/run.py check --amazon
+sudo /usr/local/sbin/alexa-egress-manager check --amazon
 ```
 
 If the synthetic check fails during startup, repeat only after reviewing cleanup.
@@ -132,7 +172,7 @@ Only after acceptance, with no other MCP/auth process accessing the same
 credential directory:
 
 ```sh
-sudo python3 -B /opt/alexa-egress/run.py run
+sudo /usr/local/sbin/alexa-egress-manager run
 ```
 
 This command is a stdio transport for a trusted MCP client, not an
@@ -180,7 +220,7 @@ After reviewing the IDs, stop/remove **only** the identified project
 containers, then remove its two empty networks, then delete only
 `inet alexa_guard` with `sudo nft delete table inet alexa_guard`.
 Do not use global prune, flush ruleset, or restart Docker. Inspect any
-remaining session directories under /run/alexa-egress; they contain generated
+remaining session directories under /run/alexa-egress-manager; they contain generated
 config and possibly synthetic auth, not a copy of the real credential file.
 Do not delete the lock while a launcher is running.
 
