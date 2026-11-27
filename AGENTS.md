@@ -63,7 +63,9 @@ the change and its implications in the decision log.
   A release candidate is not a stable release.
 - Record the source SHA, publication workflow, exact tag, immutable image
   digest, date and validation results after a successful publication.
-- A stable promotion requires live acceptance checks. A changed embedded
+- A stable promotion requires live acceptance checks, a reviewed
+  version-specific docs/stable-acceptance.json record and explicit stable
+  workflow approval. See docs/STABLE_ACCEPTANCE.md. Do not approve pending checks. A changed embedded
   application version requires a new build and validation; do not claim
   that retagging an RC changes the version inside the image.
 

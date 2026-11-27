@@ -37,9 +37,22 @@ jobs:
           sh -n egress/alexa-egress-manager
           node --check egress/probe.mjs
           node --check egress/readiness.mjs
-      - name: Build application and proxy
+      - name: Pull and verify published stable application
         run: |
-          docker build --pull --platform linux/amd64 -t local/alexa-mcp:egress-test .
+          set -euo pipefail
+          APP_REF="$(sed -n 's/^ALEXA_MCP_IMAGE=//p' egress/.env.example)"
+          test "$APP_REF" = 'ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862'
+          DOCKER_CONFIG="$(mktemp -d)"
+          export DOCKER_CONFIG
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          docker --host unix:///var/run/docker.sock pull --platform linux/amd64 "$APP_REF"
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$APP_REF")" = '1.0.0'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$APP_REF")" = '1b45d5dd20d2543eeb89a6968d1b19128d38fdf5'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{.Os}}/{{.Architecture}}' "$APP_REF")" = 'linux/amd64'
+          docker --host unix:///var/run/docker.sock image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$APP_REF" | grep -Fx "$APP_REF"
+          echo 'STABLE_IMAGE_IDENTITY: PASS'
+      - name: Build proxy
+        run: |
           docker build --pull --platform linux/amd64 -t local/alexa-egress:test egress
       - name: Verify isolation on ephemeral Linux runner
         run: |
@@ -48,7 +61,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends nftables
           fi
-          APP="$(docker image inspect --format '{{.Id}}' local/alexa-mcp:egress-test)"
+          APP="$(sed -n 's/^ALEXA_MCP_IMAGE=//p' egress/.env.example)"
           PROXY="$(docker image inspect --format '{{.Id}}' local/alexa-egress:test)"
           UPLINK="$(ip -j -4 route get 1.1.1.1 | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["dev"])')"
           sudo install -d -m 0700 /root/alexa-egress-ci

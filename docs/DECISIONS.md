@@ -67,12 +67,14 @@ develop; no unattended merge.
 
 **Rationale:** keep cost and maintenance overhead low without weakening
 security checks. Public package visibility was confirmed by the maintainer;
-anonymous download still needs direct verification.
+anonymous download of RC.2 was subsequently confirmed by the maintainer.
+The 2026-11-27 check used an empty Docker client configuration with cached
+layers; cold-cache transfer is not a required acceptance gate.
 
 ## ADR-004 — Release gate and immutable deployment identity
 
 **Date:** 2026-11-26 · **Status:** Accepted; candidate publishing implemented,
-stable promotion procedure pending.
+stable promotion and first stable publication completed.
 
 Only publish with deliberate workflow_dispatch from main and explicit
 confirmation. Use the exact tested linux/amd64 image from the validation
@@ -118,7 +120,8 @@ not enforce outbound restrictions.
 ## ADR-006 — Read-only auditing and agent boundaries
 
 **Date:** 2026-11-26 · **Status:** Accepted; static and offline validation
-complete for the original 15 read tools, live checks pending.
+complete for the original 15 read tools; supervised basic live checks
+passed for 14, with controlled device-state timeout accepted.
 
 The immediate goal is inventory before cleanup: Alexa devices, routines,
 groups, scenes, broken references and source clues. Existing upstream
@@ -142,7 +145,8 @@ guaranteed complete inventory of installed Alexa skills.
 ## ADR-007 — Private authentication and persistent credentials
 
 **Date:** 2026-11-26 · **Status:** Accepted; implementation tested offline,
-real token refresh and failure handling pending.
+natural RC.2 renewal verified by the maintainer on 2026-11-27;
+real expired-session fallback testing remains pending.
 
 Credentials stay only on the deployment host, outside the repository and
 Docker build context. Default private auth directory mode 0700 and
@@ -190,15 +194,19 @@ New builds require a new scan.
 2. Manual publication of 1.0.0-rc.1 and 1.0.0-rc.2 completed; see
    [GHCR.md](GHCR.md) and [CHANGELOG.md](../CHANGELOG.md) for evidence.
    RC.1 passed 14/15 basic live checks and exposed a device-state error
-   handling defect. RC.2 fixes it; live regression and renewal are pending.
-3. Verify anonymous pull and image metadata on the host without changing
-   the working installation. Prepare independent candidate configuration,
-   preserve rollback and test using the valid existing session safely.
-4. Verify real read-only inventory, error handling, credentials reuse and
-   renewal; test explicit auth and absence of unintended proxy exposure
-   when needed. Record sanitized acceptance results.
-5. Obtain maintainer acceptance for 1.0.0 stable; document residual risk.
-   Stable must not be claimed until real integration is verified.
+   handling defect. RC.2 live regression verified all other tools and controlled state
+   timeout. Natural RC.2 renewal and anonymous pull confirmed on 2026-11-27.
+3. Anonymous pull, image identity, independent candidate configuration,
+   rollback preservation and stored-session reuse completed for RC.2.
+4. Supervised RC.2 read-only inventory, controlled error handling, reuse
+   and natural renewal verified; sanitized evidence in STABLE_ACCEPTANCE.md.
+   Explicit reauthentication and live expired-session failure tests remain
+   separate checks when needed.
+5. Maintainer accepted residual risks on 2026-11-26 and reported completed
+   live acceptance on 2026-11-27. Stable review, authorized promotion and manual
+   1.0.0 publication completed on 2026-11-27; stable-image basic host regression and stored-session reuse subsequently
+   passed. Post-test credential metadata, cleanup and natural stable-image
+   renewal remain pending.
 6. Implement and verify outbound network restrictions with narrowly scoped
    Amazon destinations and request semantics. Do not present the bridge
    as an allowlist; do not blindly block all POST requests.
@@ -219,8 +227,8 @@ not an active task or deployed service.
 
 ## ADR-010 — Bound live device-state requests and report errors explicitly
 
-**Date:** 2026-11-26 · **Status:** Accepted; implementation published in RC.2,
-live verification pending.
+**Date:** 2026-11-26 · **Status:** Accepted; implementation published in RC.2;
+controlled timeout and subsequent inventory verified live, state retrieval pending.
 
 RC.1 live acceptance passed basic checks for 14 of 15 read tools. The
 state endpoint returned a JSON message matching throttling patterns,
@@ -250,9 +258,42 @@ after a normal quiet interval, confirming either valid state or an
 explicit error within the response deadline. Record actual successful
 state retrieval separately. No retries to bypass a rate limit.
 
-## Proposed egress implementation (ADR number assigned after stable promotion)
+## ADR-011 — Stable publication acceptance gate
 
-**Status:** Implementation draft; host and CI acceptance pending.
+**Date:** 2026-11-26 · **Status:** Accepted; 1.0.0 published, basic host regression passed; remaining host checks pending.
+
+Reuse the single manual GHCR publication workflow for RC and stable
+SemVer, with the same build, security and immutable-tag gates. Stable
+versions additionally require explicit workflow approval and a
+version-specific reviewed acceptance record in docs/stable-acceptance.json.
+All acceptance fields start false; never mark them true without evidence
+and maintainer approval. See [STABLE_ACCEPTANCE.md](STABLE_ACCEPTANCE.md).
+Do not publish stable before natural RC.2 renewal, anonymous pull and
+acceptance of the documented residual risks. This is a human evidence
+gate, not a CI live account test. No secrets or paid services are added.
+The version-specific record must be updated for future stable releases.
+
+**2026-11-27 acceptance clarification:** the current criteria require an
+anonymous pull of the reviewed digest, not a forced cold-cache layer
+transfer. The maintainer reported a successful pull with an empty
+DOCKER_CONFIG and cached layers, and successful natural RC.2 renewal.
+Record that scope without claiming a fresh transfer or independent live
+verification. Recommend a cold-cache pull of the published stable digest
+in a disposable environment. All acceptance fields for 1.0.0 are now
+recorded; review and explicit merge/publication authorization remain
+separate requirements. Both authorized promotions and the manual stable
+publication completed on 2026-11-27. The exact publication source, digest
+and validation evidence are recorded in GHCR.md; no new publication is
+required for documentation-only changes. The actual stable digest passed the maintainer-reported anonymous pull,
+offline tests, stored-session reuse and nine basic live read checks.
+Post-test credential metadata, cleanup and natural stable-image renewal
+remain pending. Independent egress development may proceed without forcing
+renewal; this does not authorize agent access or waive remaining tests.
+
+## ADR-012 — Separate guarded egress component
+
+**Date:** 2026-11-27 · **Status:** Implementation draft; stable application
+baseline selected; reconciled CI and supervised host acceptance pending.
 
 Use a self-contained egress/ folder and README, separate Compose project
 rather than an override, Squid CONNECT without TLS interception, exact
@@ -264,8 +305,35 @@ Docker/Netavark and namespace rules block embedded DNS before DNAT.
 No permanent systemd service is necessary when containers cannot restart
 automatically and each guarded session reapplies policy. Review cleanup,
 fail-closed behavior, DNS, scope and limitations in egress/THREAT_MODEL.md.
-Do not merge into develop or release 1.1.0 until the 1.0.0 release cycle is
-complete and this feature has been rebased/reconciled, reviewed and tested.
+
+The maintainer approved separate host manager, system configuration and Docker
+stack directories. Install code at /opt/alexa-egress-manager, configuration at
+/etc/alexa-egress-manager, Docker files at /opt/containers-data/AlexaEgress,
+temporary state at /run/alexa-egress-manager, and a fixed root-only command
+at /usr/local/sbin/alexa-egress-manager. All three installation directories
+must be root-controlled; refuse unsafe ancestors or existing destinations.
+New directories are normalized to root:root without changing existing
+ancestors. No changes to account credentials or existing stack files.
+
+Use the published 1.0.0 application digest from GHCR.md as the initial
+guarded baseline. CI isolation checks pull and verify this exact artifact
+anonymously, build the local Squid image, and test the actual installer
+and installed entrypoint on an ephemeral runner. The existing shared
+application CI continues to validate the current source build. A future
+change of application baseline requires explicit digest and compatibility
+review. Keep the stable application version unchanged during this
+reconciliation; decide the next release version separately before
+promotion or publication. Never republish 1.0.0.
+
+**Rationale:** preserve the accepted stable application while testing
+the independent network enforcement layer against the actual artifact.
+
+**Acceptance:** prior draft CI passed, but the reconciled branch requires
+fresh CI, synthetic host checks, supervised positive TLS and live inventory
+and natural renewal through the guarded path, interruption/recovery tests
+and resource review. No deployment, stable egress release, or autonomous
+agent access is authorized by reconciliation. Remaining stable-image
+renewal observation does not block independent egress development.
 
 ## How to update this record
 
@@ -275,14 +343,3 @@ Superseded by the new ADR, retaining history. Distinguish maintainer-approved
 requirements, engineering choices, and unimplemented proposals. Never
 include actual credentials, private host addresses, device inventories
 or account data in this public repository.
-
-## Egress manager installation layout (implementation draft)
-
-The maintainer approved separate host manager, system configuration and Docker
-stack directories. Install code at /opt/alexa-egress-manager, configuration at
-/etc/alexa-egress-manager, Docker files at /opt/containers-data/AlexaEgress,
-temporary state at /run/alexa-egress-manager, and a fixed root-only command
-at /usr/local/sbin/alexa-egress-manager. All three installation directories
-must be root-controlled; refuse unsafe ancestors or existing destinations.
-No change to the network policy, account credentials or existing stack files.
-Validate the actual installer and installed entrypoint in CI before host use.

@@ -14,12 +14,14 @@ tools remain available in the source but are not exposed by the supplied
 Docker configuration.
 
 > **Versioning:** this fork follows independent [Semantic Versioning](https://semver.org/),
-> starting at `1.0.0-rc.1`. The current published candidate is `1.0.0-rc.2`.
-> Previous images remain available under their original names.
-> This is not a stable release. The maintainer confirmed public package visibility; anonymous pulls must
-> still be verified before use; live Amazon authentication, refresh and host-specific
-> network controls still require validation. Do not replace a working production
-> deployment yet. See [CHANGELOG.md](CHANGELOG.md).
+> starting at `1.0.0-rc.1`. The current published stable version is `1.0.0`.
+> RC.2 remains available for rollback. Its supervised inventory, anonymous
+> pull and natural renewal were confirmed before stable publication.
+> The maintainer confirmed anonymous pull, offline tests, stored-session
+> reuse and nine basic live read checks on the stable image. Post-test
+> metadata checks and natural stable-image renewal remain pending. Egress controls and a
+> restricted agent gateway remain separate requirements. See
+> [CHANGELOG.md](CHANGELOG.md) and [stable acceptance](docs/STABLE_ACCEPTANCE.md).
 >
 > This project is not affiliated with or supported by Amazon. It uses
 > undocumented APIs that can change without notice, and its use may be
@@ -52,7 +54,7 @@ Docker configuration.
 ### Requirements
 
 - Linux host with Docker Engine and Docker Compose v2, Git and SSH.
-  The CI and planned GHCR distribution target `linux/amd64`.
+  The CI and GHCR distribution target `linux/amd64`.
 - A browser and an Amazon account authorized for use, including any
   authentication factors Amazon requires.
 - Docker access for the operator who launches the MCP process. Docker
@@ -61,20 +63,21 @@ Docker configuration.
 - Outbound connectivity to the required Amazon endpoints. Building locally
   also needs access to the container, Debian and npm registries.
 
-### 1. Obtain the Compose files and build the candidate
+### 1. Obtain the Compose files and optionally build locally
 
 For development and review, obtain the fork's main branch and check out
-the source commit used to publish the current candidate:
+the source commit used to publish the current stable release:
 
 ```bash
 git clone https://github.com/ridgarou/alexa-mcp.git
 cd alexa-mcp
-git checkout --detach c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9
+git checkout --detach 1b45d5dd20d2543eeb89a6968d1b19128d38fdf5
 cp .env.example .env
 docker compose version
 ```
 
 Review the selected commit, changelog and CI result before building.
+To use the published image, skip the local build and follow the GHCR section.
 For a later release, use the matching reviewed release checkout rather
 than a moving feature branch.
 
@@ -136,16 +139,16 @@ an always-running background container.
 
 ### Using GHCR instead of a local build
 
-Version `1.0.0-rc.2` was published on 2026-11-26 in
-[workflow run 45788085719](https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719).
-The public package was previously confirmed by the maintainer; verify anonymous
-access before deployment. Use this immutable image reference:
+Version `1.0.0` was published on 2026-11-27 in
+[workflow run 46050387909](https://github.com/ridgarou/alexa-mcp/actions/runs/46050387909).
+Verify anonymous access to the actual stable digest before deployment.
+Use this immutable image reference:
 
 ```dotenv
-ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810
+ALEXA_MCP_IMAGE=ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862
 ```
 
-Use the corresponding Compose files from source commit c61c23a.
+Use the corresponding Compose files from source commit 1b45d5d.
 Public packages can be pulled without a PAT after their public visibility
 has been verified. If the pull returns an authorization error, check
 package visibility rather than embedding credentials in Compose.
@@ -486,24 +489,38 @@ settings unchanged for normal operation.
   writer at a time. Local credential access and session refresh still
   carry account-level privileges.
 - A dedicated bridge is **not** an outbound allowlist. Egress enforcement,
-  real account validation and a restricted agent gateway are pending.
+  a restricted agent gateway and additional host isolation remain pending.
+  Supervised RC.2 inventory and natural renewal are documented separately.
 - Read-only MCP tools do not make the Amazon credential itself read-only.
   Some read queries use POST. See [READ_ONLY_AUDIT.md](docs/READ_ONLY_AUDIT.md).
 - Responses may contain private device information, voice history,
   routines and untrusted text. Do not treat returned content as instructions.
-- The candidate uses pinned dependencies and image bases, npm signatures
+- The published application uses pinned dependencies and image bases, npm signatures
   and vulnerability scanning. A successful audit does not establish
   absence of vulnerabilities. See [SECURITY.md](docs/SECURITY.md).
 - Authentication logs are suppressed and the Compose logging driver is
   disabled; no real account data belongs in GitHub Actions or issue reports.
 
-## Optional egress isolation (experimental)
+## Experimental egress component
 
-See [egress/README.md](egress/README.md) for the separate guarded Squid component, prerequisites, threat model and acceptance tests. It is not part of the current published RC.2 image or approved for autonomous access.
+See [egress/README.md](egress/README.md) for the separate guarded Squid
+component, installation prerequisites, threat model and acceptance tests.
+Its initial application baseline is the immutable published 1.0.0 image.
+The egress component is not part of that published image; no guarded host
+acceptance or autonomous agent access has been approved.
+
+## Stable release status
+
+Version 1.0.0 was published after the reviewed RC.2 acceptance and explicit
+manual approval. The fresh image passed publication validation and supervised basic
+host regression (nine of nine calls). Natural renewal on 1.0.0 and
+post-test metadata checks remain pending. Keep
+RC.2 for rollback. See [stable acceptance](docs/STABLE_ACCEPTANCE.md) for
+evidence and limitations.
 
 ## Known limitations
 
-- In the published RC.2 image, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live verification is still pending. The inventory tools do not require live state queries.
+- In the published 1.0.0 and RC.2 images, `alexa_query_device` returns explicit sanitized MCP errors for throttling, malformed responses, empty states and endpoint failures. A successful response keeps its existing shape. State requests are single-flight per process, with a 25-second response deadline after authentication and a 60-second cooldown after throttling or timeout. The dependency may continue its own request/retry after the deadline; do not retry immediately or restart the process to bypass the cooldown. RC.1 does not contain this fix. RC.2 live regression verified the controlled timeout and a subsequent successful inventory call; successful state retrieval remains unverified. The inventory tools do not require live state queries.
 
 - **Unofficial API** — can break whenever Amazon changes it.
 - **Routine deletion endpoint is unverified.** `alexa_delete_routine` attempts

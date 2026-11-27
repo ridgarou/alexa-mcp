@@ -44,7 +44,8 @@ capabilities, non-root users, no restart and bounded resources.
 
 Linux amd64, rootful local Docker Engine 28+ (isolated bridge support),
 Compose 2.33.1+ (gateway priority), Python 3, nftables, iproute2 and nsenter.
-Node 22.21+ with native proxy support. The current reviewed app is Node 22.
+Node 22.21+ with native proxy support. The initial reviewed application baseline is the published 1.0.0 image
+(Node 22), pinned to its immutable digest in .env.example.
 The launcher requires root and must live in a root-owned directory whose
 ancestors are not group/world writable. Never expose this script, Docker
 socket, root SSH or arbitrary command execution to agents. Review all files
@@ -64,6 +65,18 @@ Review and scan this local image, including unfixed findings. The build uses
 updated Debian packages, so it is not bit-for-bit reproducible. The proxy
 is not yet published to GHCR. Pin the resulting local sha256 image ID;
 do not use a mutable tag in the launcher configuration.
+
+Pull and verify the exact published application image before using the launcher.
+The launcher never pulls images or builds at runtime.
+
+```sh
+docker pull --platform linux/amd64 ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862
+docker image inspect --format 'Version={{index .Config.Labels "org.opencontainers.image.version"}} Revision={{index .Config.Labels "org.opencontainers.image.revision"}}' ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862
+```
+
+Expect version 1.0.0 and revision `1b45d5dd20d2543eeb89a6968d1b19128d38fdf5`.
+The normal stable installation remains independent and available for rollback.
+The egress component is not included in the published 1.0.0 application image.
 
 ## Install the manager and Docker stack
 
@@ -119,7 +132,7 @@ sudo install -m 0600 /etc/alexa-egress-manager/.env.example /etc/alexa-egress-ma
 sudoedit /etc/alexa-egress-manager/.env
 ```
 
-Set the reviewed app digest (the example uses RC.2 pending stable release),
+Set the reviewed app digest (the example uses the published 1.0.0 image),
 proxy image ID, selected physical uplink, auth directory and disjoint
 IPv4 networks. Check existing Docker/Podman subnets and all host routes.
 The launcher rejects overlaps. The Spain-specific locale and exact
@@ -230,8 +243,10 @@ Do not delete the lock while a launcher is running.
 
 ## Acceptance checklist
 
-- Static tests, CI build, Squid parse/start, negative isolation probes, image
-  vulnerability scan and verified cleanup.
+- Static tests, anonymous pull and identity of the pinned stable application,
+  CI proxy build, Squid parse/start, negative isolation probes, image
+  vulnerability scan and verified cleanup. Shared application CI separately
+  validates the current source build.
 - Host checks with synthetic auth, including known live host/LAN services,
   DNS and direct IP/IPv6 paths, missing guard and concurrent launch.
 - Positive verified TLS through native Node proxy, real supervised inventory
