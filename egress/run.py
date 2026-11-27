@@ -46,6 +46,7 @@ def note(message):
 
 def cmd(args, *, data=None, capture=True, timeout=60, env=None, check=True):
     return subprocess.run(args, input=data, text=True,
+                          stdin=subprocess.DEVNULL if data is None else None,
                           stdout=subprocess.PIPE if capture else None,
                           stderr=subprocess.PIPE if capture else None,
                           env=env or ENV, timeout=timeout, check=check)

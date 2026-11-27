@@ -40,7 +40,9 @@ def supervise(child, proxy, source=0, sink=1, eof_timeout=EOF_TIMEOUT):
             poller = select.poll()
             # Even with buffered input, observe disconnects without allocating
             # additional memory. A pipe HUP can accompany unread data.
-            if not eof:
+            if not eof and (not pending or deadline is None):
+                # Once HUP has armed the deadline, wait for writable child
+                # input instead of repeatedly polling the hung-up source.
                 poller.register(source, 0 if pending else select.POLLIN)
             if pending:
                 poller.register(target, select.POLLOUT)

@@ -38,8 +38,8 @@ class SupervisorTests(unittest.TestCase):
                 proc.wait(timeout=3)
 
     def test_exact_input_and_clean_eof(self):
-        self.scenario(b"synthetic\\n",
-            "import sys; sys.exit(0 if sys.stdin.buffer.read() == b'synthetic\\\\n' else 1)")
+        self.scenario(b"synthetic\n",
+            "import sys; sys.exit(0 if sys.stdin.buffer.read() == b'synthetic\\n' else 1)")
 
     def test_stuck_after_eof(self):
         self.scenario(b"", "import sys,time; sys.stdin.read(); time.sleep(30)",
@@ -52,6 +52,25 @@ class SupervisorTests(unittest.TestCase):
     def test_nonzero_child(self):
         self.scenario(b"", "import sys; sys.stdin.read(); sys.exit(7)",
                       "MCP_PROCESS_FAILED")
+
+    def test_disconnected_output(self):
+        r, w = os.pipe()
+        out_read, out_write = os.pipe()
+        os.close(out_read)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
+                                 stdin=subprocess.PIPE, bufsize=0)
+        proxy = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            with self.assertRaisesRegex(RuntimeError, "MCP_CLIENT_OUTPUT_CLOSED"):
+                supervise(child, proxy, source=r, sink=out_write)
+        finally:
+            os.close(r)
+            os.close(w)
+            os.close(out_write)
+            for proc in (child, proxy):
+                if proc.poll() is None:
+                    proc.kill()
+                proc.wait(timeout=3)
 
     def test_input_open_early_exit(self):
         r, w = os.pipe()
