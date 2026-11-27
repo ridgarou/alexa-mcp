@@ -62,15 +62,22 @@ def main():
         if create_stack_parent:
             STACK.parent.mkdir(mode=0o700)
             created_dirs.append(STACK.parent)
+            os.chown(STACK.parent, 0, 0)
+            os.chmod(STACK.parent, 0o700)
         for directory in LAYOUT:
             directory.mkdir(mode=0o700)
             created_dirs.append(directory)
+            # mkdir can inherit group and setgid from an existing parent.
+            # Normalize only the directory we just created, never its parent.
+            os.chown(directory, 0, 0)
+            os.chmod(directory, 0o700)
         for path, data, mode in payloads:
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
             created_files.append(path)
             with os.fdopen(fd, "wb") as stream:
                 stream.write(data)
                 stream.flush()
+                os.fchown(stream.fileno(), 0, 0)
                 os.fchmod(stream.fileno(), mode)
         print("EGRESS_MANAGER_INSTALL: PASS")
         print("Review and create /etc/alexa-egress-manager/.env before running checks.")

@@ -55,7 +55,31 @@ jobs:
           sudo cp -a egress/. /root/alexa-egress-ci/
           sudo chown -R root:root /root/alexa-egress-ci
           sudo chmod -R go-w /root/alexa-egress-ci
+          # Hosted runners may have a developer-writable /opt. Normalize ONLY
+          # this ephemeral test runner, never a deployment host.
+          sudo test -d /opt
+          sudo test ! -L /opt
+          sudo chown root:root /opt
+          sudo chmod 0755 /opt
+          # Reproduce a root-owned, non-writable setgid stack parent.
+          sudo test ! -e /opt/containers-data
+          sudo install -d -o root -g users -m 2775 /opt/containers-data
+          if sudo python3 -I -B /root/alexa-egress-ci/install.py; then
+            echo 'Unexpected acceptance of writable ancestor'; exit 1
+          fi
+          sudo test ! -e /opt/alexa-egress-manager
+          sudo test ! -e /etc/alexa-egress-manager
+          sudo test ! -e /opt/containers-data/AlexaEgress
+          sudo test ! -e /usr/local/sbin/alexa-egress-manager
+          sudo chmod 2755 /opt/containers-data
+          PARENT_BEFORE="$(sudo stat -c '%a:%u:%g' /opt/containers-data)"
           sudo python3 -I -B /root/alexa-egress-ci/install.py
+          test "$(sudo stat -c '%a:%u:%g' /opt/containers-data)" = "$PARENT_BEFORE"
+          for DIR in /opt/alexa-egress-manager /etc/alexa-egress-manager /opt/containers-data/AlexaEgress; do
+            test "$(sudo stat -c '%a:%u:%g' "$DIR")" = '700:0:0'
+          done
+          test "$(sudo stat -c '%a:%u:%g' /usr/local/sbin/alexa-egress-manager)" = '755:0:0'
+          test "$(sudo stat -c '%a:%u:%g' /opt/containers-data/AlexaEgress/AlexaEgress.yml)" = '644:0:0'
           if sudo python3 -I -B /root/alexa-egress-ci/install.py; then
             echo 'Unexpected overwrite permission'; exit 1
           fi

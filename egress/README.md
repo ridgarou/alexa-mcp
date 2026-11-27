@@ -86,7 +86,11 @@ or Docker API access can defeat ordinary filesystem permissions.
 
 Before installation, inspect the existing parent with
 `namei -l /opt/containers-data`. If it is not root controlled, stop.
-Do not recursively change ownership or permissions of existing stacks.
+A root-owned ancestor with setgid and no group/other write permission is
+acceptable. New directories and files are explicitly normalized to root:root;
+setgid is not inherited into the installed directories. The existing parent
+is left unchanged. Do not recursively change ownership or permissions of
+existing stacks.
 
 From a reviewed, pinned checkout, prepare a new staging directory and copy
 only reviewed files. Do not execute unreviewed code as root.

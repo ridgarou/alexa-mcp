@@ -56,7 +56,8 @@ def trusted_directory(path):
 
 def trusted_file(path, private=False):
     st = path.lstat()
-    if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_mode & (0o077 if private else 0o022):
+    if (not stat.S_ISREG(st.st_mode) or (st.st_uid, st.st_gid) != (0, 0)
+            or (stat.S_IMODE(st.st_mode) != 0o600 if private else st.st_mode & 0o022)):
         raise RuntimeError("Untrusted launcher/configuration file")
 
 def load_env():
@@ -273,8 +274,9 @@ def main():
         raise RuntimeError("Run as root on the trusted Docker host")
     for directory in (ROOT, CONFIG, STACK):
         trusted_directory(directory)
-        if stat.S_IMODE(directory.stat().st_mode) != 0o700:
-            raise RuntimeError("Manager, configuration and stack directories must be mode 0700")
+        st = directory.stat()
+        if st.st_gid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
+            raise RuntimeError("Manager, configuration and stack directories must be root:root mode 0700")
     for name in ("run.py", "policy.py", "probe.mjs", "readiness.mjs"):
         trusted_file(ROOT / name)
     for name in ("AlexaEgress.yml", "squid.conf.template", "allowed-domains.txt"):
@@ -283,7 +285,7 @@ def main():
     trusted_directory(STATE.parent)
     STATE.mkdir(mode=0o700, exist_ok=True)
     trusted_directory(STATE)
-    if stat.S_IMODE(STATE.stat().st_mode) != 0o700:
+    if STATE.stat().st_gid != 0 or stat.S_IMODE(STATE.stat().st_mode) != 0o700:
         raise RuntimeError("Unsafe runtime state directory")
     with contextlib.ExitStack() as stack:
         fd = os.open(STATE / "session.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
