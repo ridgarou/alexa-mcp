@@ -67,6 +67,12 @@ auth logs. The normal server must not intentionally expose login ports.
 
 ## Outstanding work
 
+- The guarded 1.0.0 inventory succeeded but authenticated MCP shutdown on
+  stdin EOF timed out. The 1.0.1-rc.1 candidate addresses the remote
+  lifecycle, not the network policy. Live normal closure, cleanup and
+  natural renewal of the candidate remain unverified. A deadline failure
+  is not a successful shutdown. Keep the published stable digest for rollback.
+
 - The static [read-only audit](READ_ONLY_AUDIT.md) and supervised RC.2 basic
   live checks are recorded; no independent packet trace is claimed.
 - Real natural renewal and preserved credential permissions were confirmed

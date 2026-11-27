@@ -290,6 +290,37 @@ Post-test credential metadata, cleanup and natural stable-image renewal
 remain pending. Independent egress development may proceed without forcing
 renewal; this does not authorize agent access or waive remaining tests.
 
+## ADR-012 — Bound authenticated MCP stdio shutdown
+
+**Date:** 2026-11-27 · **Status:** Proposed correction in 1.0.1-rc.1; CI and live acceptance pending.
+
+The supervised guarded 1.0.0 inventory succeeded; closing stdin did not
+finish within 45 seconds. The client interrupted the manager, which
+returned 130. Independent Docker exec EOF and offline MCP closure passed.
+Pinned alexa-remote2 8.1.1 creates a refresh timer on init and exposes
+stop() to clear it and disconnect push; the timer is a likely cause, not
+an independently measured sole cause.
+
+The MCP process owns the remote from creation. On EOF, SIGINT or SIGTERM,
+stop accepting new initialization and callback-wrapped requests, stop the
+remote, close the transport and let active callbacks drain. Stop again on
+a late initialization callback; preserve synchronous atomic cookie writes
+already in flight. Failed initialization also releases its resources.
+Do not change the renewal interval, disable renewal or reauthenticate.
+Upstream requests cannot all be cancelled; a callback can transiently
+create resources during shutdown. A ten-second unref'ed deadline exits
+nonzero if handles remain, rather than reporting a clean shutdown.
+Normal EOF should exit zero; signals retain conventional 130/143 status.
+The egress manager still needs independent bounded lifecycle protection.
+
+Test the actual entrypoint with synthetic remote initialization, a real
+upstream stop(), long-lived timer, late callback, initialization failure,
+signals and a stuck handle. No account data or network access in tests.
+Use an independently published RC and supervised live acceptance before
+the stable 1.0.1 release; do not mark the 1.0.0 acceptance record as
+approval of a different version. Keep 1.0.0 as rollback. Reconcile the
+separate Egress draft after the correction; allocate its ADR number then.
+
 ## How to update this record
 
 Use the next ADR number. Include date, status, context, decision, rationale,

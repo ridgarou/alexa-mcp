@@ -7,7 +7,10 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- Prepare 1.0.1-rc.1: stop the upstream Alexa remote on MCP stdio EOF or termination signals, including pending initialization and late callbacks. Bound stuck process shutdown to a 10-second failure deadline without changing renewal intervals, read-only tools or dependencies.
+- The 1.0.0 guarded host inventory succeeded but normal closure timed out; Docker EOF and offline MCP closure passed. The candidate adds synthetic authenticated-process lifecycle regression tests. Live shutdown and renewal acceptance remain pending.
 
 ## [1.0.0] - 2026-11-27
 

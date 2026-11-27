@@ -501,6 +501,14 @@ settings unchanged for normal operation.
 - Authentication logs are suppressed and the Compose logging driver is
   disabled; no real account data belongs in GitHub Actions or issue reports.
 
+## Unreleased lifecycle correction
+
+The published 1.0.0 image passed guarded inventory, but a supervised session
+did not exit normally on stdin EOF after authentication. The 1.0.1-rc.1
+candidate source addresses remote cleanup and bounded process shutdown;
+it is not yet published or accepted. Do not change the installed digest
+until a new artifact has passed review and supervised testing.
+
 ## Stable release status
 
 Version 1.0.0 was published after the reviewed RC.2 acceptance and explicit
