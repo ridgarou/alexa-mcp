@@ -1,15 +1,20 @@
-name: Publish validated candidate (manual)
+name: Publish validated image (manual)
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Candidate version (e.g. 1.0.0-rc.2)"
+        description: "Exact package version (e.g. 1.0.0 or 1.1.0-rc.1)"
         required: true
-        default: "1.0.0-rc.2"
+        default: "1.0.0"
         type: string
       confirm_publish:
-        description: "I explicitly approve publishing this candidate to GHCR"
+        description: "I explicitly approve publishing this version to GHCR"
         required: true
+        default: false
+        type: boolean
+      confirm_stable_acceptance:
+        description: "Stable only: I verified live acceptance and accept documented limitations and residual risks"
+        required: false
         default: false
         type: boolean
 permissions:
@@ -26,13 +31,21 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Validate candidate version
+      - name: Validate release version and stable approval
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
+          STABLE_ACCEPTED: ${{ inputs.confirm_stable_acceptance }}
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+          if [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release candidate requested."
+          elif [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            [[ "$STABLE_ACCEPTED" == "true" ]] || { echo "Stable live acceptance approval required."; exit 1; }
+          else
+            echo "Unsupported release version."
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -42,6 +55,11 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           test "$(node -p 'require("./package.json").version')" = "$VERSION"
+          # Stable publication also requires a reviewed, version-specific
+          # acceptance record in main. No live credentials enter CI.
+          if [[ "$VERSION" != *-rc.* ]]; then
+            node -e 'const r=require("./docs/stable-acceptance.json"); if(r.approvedVersion!==process.env.VERSION || r.renewalVerified!==true || r.anonymousPullVerified!==true || r.residualRisksAccepted!==true) { console.error("Stable acceptance record incomplete."); process.exit(1); }'
+          fi
       - uses: ./.github/actions/validate-candidate
       - name: Publish the exact tested image
         shell: bash
@@ -78,7 +96,11 @@ jobs:
           [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
           docker buildx imagetools inspect "$IMAGE@$DIGEST"
           {
-            echo '## Published candidate (not production)'
+            if [[ "$VERSION" == *-rc.* ]]; then
+              echo '## Published release candidate (not stable)'
+            else
+              echo '## Published stable version (supervised local use; see acceptance record)'
+            fi
             echo
             echo "Tag: $IMAGE:$TAG"
             echo

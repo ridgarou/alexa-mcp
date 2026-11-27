@@ -7,6 +7,11 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare independent stable version 1.0.0 with no dependency or application behavior changes from RC.2. Extend the manual GHCR workflow to accept stable SemVer only after explicit stable approval and a reviewed version-specific acceptance record. Live acceptance is complete; review, explicit merge approval, fresh build validation and explicit publication remain required. See [STABLE_ACCEPTANCE.md](docs/STABLE_ACCEPTANCE.md).
+- Record sanitized RC.2 host regression, credential reuse, natural renewal and anonymous pull evidence (2026-11-27; cached layers). Retain the accepted device-state and short-duration performance limitations.
+
 ## [1.0.0-rc.2] - 2026-11-26
 
 Second release candidate, published to GHCR after the device-state correction.
@@ -17,7 +22,7 @@ Second release candidate, published to GHCR after the device-state correction.
 - Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810`.
 - Publication passed 28 unit tests, both 15-tool offline MCP checks, npm audit (zero vulnerabilities), 157 registry signatures and 18 attestations.
 - Trivy reported 52 high findings without available fixes (13 distinct advisories), zero critical and zero fixable findings.
-- Registry push and authenticated manifest inspection passed. RC.2 anonymous pull, live regression checks, successful device-state retrieval and credential renewal remain pending.
+- Registry push and authenticated manifest inspection passed. At publication, anonymous pull, live regression and credential renewal were pending; subsequent supervised acceptance is recorded under Unreleased and in STABLE_ACCEPTANCE.md. Successful device-state retrieval remains unverified.
 - PR #10 required ancestry reconciliation because earlier merge results had a single parent despite a conventional merge being requested. The reconciled commit retained the exact reviewed tree; PR #10 passed CI and its final merge has both expected parents.
 
 ### Fixed
@@ -41,7 +46,7 @@ First published candidate under independent SemVer. This is not a stable release
 - Publication passed 18 unit tests, both 15-tool MCP checks (including version consistency), npm audit (zero vulnerabilities), 157 registry signatures and 18 attestations.
 - Trivy reported 52 high findings without available fixes (13 distinct advisories), zero critical and zero fixable findings.
 - PR #6 initially failed the eventsource-parser@3.1.0 attestation check; [attempt 2](https://github.com/ridgarou/alexa-mcp/actions/runs/45769177880/attempts/2) and publication passed with unchanged dependencies and security gates. The cause remains undetermined.
-- Registry push and authenticated manifest inspection passed. Anonymous pull, live Amazon authentication/refresh, host acceptance and stable promotion remain pending.
+- Registry push and authenticated manifest inspection passed. At publication, anonymous pull, live Amazon authentication/refresh, host acceptance and stable promotion were pending.
 
 ### Added
 
