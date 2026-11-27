@@ -1,8 +1,19 @@
 # GHCR release publication
 
-## Published candidates
+## Published releases and candidates
 
-### 1.0.0-rc.2 (current candidate)
+### 1.0.0 (current stable)
+
+- Published 2026-11-27 (18:34 UTC), source commit [`1b45d5dd20d2543eeb89a6968d1b19128d38fdf5`](https://github.com/ridgarou/alexa-mcp/commit/1b45d5dd20d2543eeb89a6968d1b19128d38fdf5).
+- [Manual publication workflow 46050387909](https://github.com/ridgarou/alexa-mcp/actions/runs/46050387909) passed.
+- Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862`.
+- Linux amd64 child manifest: `sha256:171cebedd80558ee042d3f50e0328a3e595279c5665cc65dda011b4d3cf10602`.
+- Fresh 1.0.0 build, 28 unit tests, both 15-tool offline MCP checks, zero npm vulnerabilities, 157 verified signatures and 18 verified attestations.
+- Trivy: 52 unfixed high findings (13 distinct advisory IDs), zero critical and zero fixable findings. The current policy passed; this is not a vulnerability-free image.
+- Registry push and authenticated manifest inspection passed. The maintainer subsequently confirmed anonymous stable-digest pull, image identity, offline MCP validation, stored-session reuse and nine basic live read-tool checks. Cold-cache transfer, post-test credential permissions and natural renewal on 1.0.0 have not yet been separately confirmed. See STABLE_ACCEPTANCE.md for scope.
+
+### 1.0.0-rc.2 (rollback candidate)
 
 - Published 2026-11-26, source commit `c61c23a`.
 - [Successful publication workflow](https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719).
@@ -29,7 +40,7 @@
 - Registry push and authenticated inspection passed. The maintainer confirmed public package visibility;
   anonymous access still requires verification.
 
-The manual workflow supports release candidates and stable versions. Stable publication requires reviewed live acceptance and explicit approval; current published RC.2 is not stable.
+The manual workflow supports release candidates and stable versions. Stable publication requires reviewed live acceptance and explicit approval; RC.2 remains a release candidate and rollback image; 1.0.0 has been published after the separate acceptance and approval gates.
 There is no push, PR, schedule, release or tag trigger for publication.
 
 ## Before publication
@@ -84,7 +95,7 @@ bandwidth are currently free according to GitHub's billing documentation;
 review the policy before publishing future versions. Public packages can be
 pulled without a PAT.
 
-## Deployment (later)
+## Deployment and post-publication acceptance
 
 Use the exact digest from the successful workflow summary in the local .env:
 
