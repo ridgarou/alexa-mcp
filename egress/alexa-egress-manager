@@ -1,5 +1,21 @@
 #!/bin/sh
-# Fixed root-controlled interpreter and module paths; no caller Python imports.
+# Verify root-controlled import paths before loading privileged local code.
 set -eu
 [ "$(/usr/bin/id -u)" -eq 0 ] || { echo "Run as root" >&2; exit 1; }
-exec /usr/bin/python3 -I -B -c 'import sys, runpy; sys.path.insert(0, "/opt/alexa-egress-manager"); runpy.run_path("/opt/alexa-egress-manager/run.py", run_name="__main__")' "$@"
+exec /usr/bin/python3 -I -B -c '
+import sys, runpy, stat
+from pathlib import Path
+root = Path("/opt/alexa-egress-manager")
+for directory in (root, *root.parents):
+    s = directory.lstat()
+    if not stat.S_ISDIR(s.st_mode) or s.st_uid != 0 or s.st_mode & 0o022:
+        sys.exit("Untrusted manager directory")
+if root.stat().st_gid != 0 or stat.S_IMODE(root.stat().st_mode) != 0o700:
+    sys.exit("Unsafe manager permissions")
+for name in ("run.py", "policy.py", "supervisor.py"):
+    s = (root / name).lstat()
+    if not stat.S_ISREG(s.st_mode) or (s.st_uid, s.st_gid) != (0, 0) or s.st_mode & 0o022:
+        sys.exit("Untrusted manager source")
+sys.path.insert(0, str(root))
+runpy.run_path(str(root / "run.py"), run_name="__main__")
+' "$@"

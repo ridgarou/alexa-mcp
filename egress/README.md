@@ -44,7 +44,7 @@ capabilities, non-root users, no restart and bounded resources.
 
 Linux amd64, rootful local Docker Engine 28+ (isolated bridge support),
 Compose 2.33.1+ (gateway priority), Python 3, nftables, iproute2 and nsenter.
-Node 22.21+ with native proxy support. The initial reviewed application baseline is the published 1.0.0 image
+Node 22.21+ with native proxy support. The initial reviewed application baseline is the published 1.0.1-rc.1 candidate
 (Node 22), pinned to its immutable digest in .env.example.
 The launcher requires root and must live in a root-owned directory whose
 ancestors are not group/world writable. Never expose this script, Docker
@@ -132,7 +132,7 @@ sudo install -m 0600 /etc/alexa-egress-manager/.env.example /etc/alexa-egress-ma
 sudoedit /etc/alexa-egress-manager/.env
 ```
 
-Set the reviewed app digest (the example uses the published 1.0.0 image),
+Set the reviewed app digest (the example uses the published 1.0.1-rc.1 candidate),
 proxy image ID, selected physical uplink, auth directory and disjoint
 IPv4 networks. Check existing Docker/Podman subnets and all host routes.
 The launcher rejects overlaps. The Spain-specific locale and exact
@@ -220,8 +220,24 @@ reviewed DNS routes excepted. IPv6 IP traffic is denied in both namespaces.
 The proxy may still query arbitrary names if the trusted proxy itself is
 compromised; this is not a guarantee of zero exfiltration.
 
+The attached MCP exec is supervised by a bounded 64 KiB stdin relay. EOF
+closes child stdin and starts a 15-second independent deadline (including
+queued input); a stuck process fails rather than keeping the session open.
+The manager polls the attached Squid exec every 250 ms and fails if it exits.
+This does not prove Squid responsiveness or continuously verify policy or
+routes. Child stderr is suppressed. A disconnected output pipe also fails.
 A normal exit or interrupt removes the project before removing its host
-guard. No persistent service is needed: the next session reapplies policy.
+guard. Repeated SIGINT/SIGTERM during bounded cleanup are deferred. A
+failed cleanup retains the guard, attempts a targeted stop, and requires
+manual inspection. A success marker is emitted only after cleanup.
+SIGINT/SIGTERM return 130/143. No idle or total session timeout is imposed.
+
+CI exercises the installed manager with empty synthetic auth using
+`check --lifecycle mcp` (real offline MCP handshake/EOF) and
+`check --lifecycle stuck` (fixed intentionally stuck Node process).
+The disposable runner harness also stops only the test proxy and sends
+SIGTERM to the test manager while checking concurrent launch rejection.
+These options are check-only; never use fault injection on live sessions. No persistent service is needed: the next session reapplies policy.
 A hard kill, Docker failure or interrupted cleanup can leave resources.
 A subsequent launch refuses to proceed when existing project resources or
 the host table are present. Do not delete the guard while any project
@@ -241,9 +257,22 @@ remaining session directories under /run/alexa-egress-manager; they contain gene
 config and possibly synthetic auth, not a copy of the real credential file.
 Do not delete the lock while a launcher is running.
 
+## Current acceptance evidence
+
+The initial installed manager passed supervised host isolation (15/15),
+unauthenticated verified TLS, and live inventory with 1.0.0. Normal EOF
+then timed out. Published 1.0.1-rc.1 subsequently passed supervised live
+inventory and normal closure with and without Egress, and 14 basic live
+read-tool checks through Egress in one session (no live device-state
+query). Credential file ownership/mode passed before and after the latter
+session; renewal was not observed. These results refer to the prior
+manager revision, not this new supervisor. New lifecycle CI and host
+acceptance, cleanup inspection and natural renewal remain pending.
+No stable egress release or agent access approved.
+
 ## Acceptance checklist
 
-- Static tests, anonymous pull and identity of the pinned stable application,
+- Static tests, anonymous pull and identity of the pinned application candidate,
   CI proxy build, Squid parse/start, negative isolation probes, image
   vulnerability scan and verified cleanup. Shared application CI separately
   validates the current source build.

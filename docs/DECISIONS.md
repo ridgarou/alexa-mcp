@@ -290,10 +290,41 @@ Post-test credential metadata, cleanup and natural stable-image renewal
 remain pending. Independent egress development may proceed without forcing
 renewal; this does not authorize agent access or waive remaining tests.
 
-## ADR-012 — Separate guarded egress component
+## ADR-012 — Bound authenticated MCP stdio shutdown
+
+**Date:** 2026-11-27 · **Status:** Proposed correction in 1.0.1-rc.1; CI and live acceptance pending.
+
+The supervised guarded 1.0.0 inventory succeeded; closing stdin did not
+finish within 45 seconds. The client interrupted the manager, which
+returned 130. Independent Docker exec EOF and offline MCP closure passed.
+Pinned alexa-remote2 8.1.1 creates a refresh timer on init and exposes
+stop() to clear it and disconnect push; the timer is a likely cause, not
+an independently measured sole cause.
+
+The MCP process owns the remote from creation. On EOF, SIGINT or SIGTERM,
+stop accepting new initialization and callback-wrapped requests, stop the
+remote, close the transport and let active callbacks drain. Stop again on
+a late initialization callback; preserve synchronous atomic cookie writes
+already in flight. Failed initialization also releases its resources.
+Do not change the renewal interval, disable renewal or reauthenticate.
+Upstream requests cannot all be cancelled; a callback can transiently
+create resources during shutdown. A ten-second unref'ed deadline exits
+nonzero if handles remain, rather than reporting a clean shutdown.
+Normal EOF should exit zero; signals retain conventional 130/143 status.
+The egress manager still needs independent bounded lifecycle protection.
+
+Test the actual entrypoint with synthetic remote initialization, a real
+upstream stop(), long-lived timer, late callback, initialization failure,
+signals and a stuck handle. No account data or network access in tests.
+Use an independently published RC and supervised live acceptance before
+the stable 1.0.1 release; do not mark the 1.0.0 acceptance record as
+approval of a different version. Keep 1.0.0 as rollback. Reconcile the
+separate Egress draft after the correction; allocate its ADR number then.
+
+## ADR-013 — Separate guarded egress component
 
 **Date:** 2026-11-27 · **Status:** Implementation draft; stable application
-baseline selected; reconciled CI and supervised host acceptance pending.
+baseline revised to the published shutdown-fix RC; new supervisor acceptance pending.
 
 Use a self-contained egress/ folder and README, separate Compose project
 rather than an override, Squid CONNECT without TLS interception, exact
@@ -315,8 +346,10 @@ must be root-controlled; refuse unsafe ancestors or existing destinations.
 New directories are normalized to root:root without changing existing
 ancestors. No changes to account credentials or existing stack files.
 
-Use the published 1.0.0 application digest from GHCR.md as the initial
-guarded baseline. CI isolation checks pull and verify this exact artifact
+The initial guarded baseline was published 1.0.0. After its live EOF
+failure, use the published 1.0.1-rc.1 digest as the provisional baseline.
+Do not confuse it with stable acceptance; switch to a reviewed 1.0.1
+stable digest after the separate publication gate. CI isolation checks pull and verify this exact artifact
 anonymously, build the local Squid image, and test the actual installer
 and installed entrypoint on an ephemeral runner. The existing shared
 application CI continues to validate the current source build. A future
@@ -324,6 +357,16 @@ change of application baseline requires explicit digest and compatibility
 review. Keep the stable application version unchanged during this
 reconciliation; decide the next release version separately before
 promotion or publication. Never republish 1.0.0.
+
+Bound the manager independently of application cleanup. Relay stdin with
+at most 64 KiB buffered and a 15-second deadline once EOF/HUP is observed.
+Poll attached exec processes every 250 ms; proxy exit or output disconnect
+fails the session. Stop/remove the project and verify containers, networks
+and bridge absence before deleting only its guard table. Defer repeated
+signals during bounded cleanup and preserve guard on uncertainty. Failures
+return nonzero, including stuck child, proxy exit and interrupted session.
+Use fixed synthetic check-only fixtures and disposable-runner fault tests.
+This is not a continuous policy integrity monitor or proof of proxy health.
 
 **Rationale:** preserve the accepted stable application while testing
 the independent network enforcement layer against the actual artifact.

@@ -33,24 +33,24 @@ jobs:
       - name: Static policy tests
         run: |
           python3 -m unittest discover -s egress -p 'test_*.py' -v
-          python3 -m py_compile egress/run.py egress/policy.py egress/install.py
+          python3 -m py_compile egress/run.py egress/policy.py egress/install.py egress/supervisor.py egress/test_lifecycle.py
           sh -n egress/alexa-egress-manager
           node --check egress/probe.mjs
           node --check egress/readiness.mjs
-      - name: Pull and verify published stable application
+      - name: Pull and verify published application candidate
         run: |
           set -euo pipefail
           APP_REF="$(sed -n 's/^ALEXA_MCP_IMAGE=//p' egress/.env.example)"
-          test "$APP_REF" = 'ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862'
+          test "$APP_REF" = 'ghcr.io/ridgarou/alexa-mcp@sha256:538273eb99b540d597b5e9d318a3132f17a245e3553f1fe57b402ceced304707'
           DOCKER_CONFIG="$(mktemp -d)"
           export DOCKER_CONFIG
           trap 'rm -rf "$DOCKER_CONFIG"' EXIT
           docker --host unix:///var/run/docker.sock pull --platform linux/amd64 "$APP_REF"
-          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$APP_REF")" = '1.0.0'
-          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$APP_REF")" = '1b45d5dd20d2543eeb89a6968d1b19128d38fdf5'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$APP_REF")" = '1.0.1-rc.1'
+          test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$APP_REF")" = '5943f0a4f91e9b12e4300506528d9409091bbbfe'
           test "$(docker --host unix:///var/run/docker.sock image inspect --format '{{.Os}}/{{.Architecture}}' "$APP_REF")" = 'linux/amd64'
           docker --host unix:///var/run/docker.sock image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$APP_REF" | grep -Fx "$APP_REF"
-          echo 'STABLE_IMAGE_IDENTITY: PASS'
+          echo 'CANDIDATE_IMAGE_IDENTITY: PASS'
       - name: Build proxy
         run: |
           docker build --pull --platform linux/amd64 -t local/alexa-egress:test egress
@@ -111,6 +111,7 @@ jobs:
             echo "Guard table unexpectedly remains after successful cleanup"
             exit 1
           fi
+          sudo python3 -I -B /root/alexa-egress-ci/test_lifecycle.py
       - name: Scan proxy runtime
         if: always() && !cancelled()
         run: |

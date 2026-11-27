@@ -505,9 +505,17 @@ settings unchanged for normal operation.
 
 See [egress/README.md](egress/README.md) for the separate guarded Squid
 component, installation prerequisites, threat model and acceptance tests.
-Its initial application baseline is the immutable published 1.0.0 image.
-The egress component is not part of that published image; no guarded host
-acceptance or autonomous agent access has been approved.
+The provisional baseline is published 1.0.1-rc.1. Prior manager supervised
+host inventory and closure passed; new supervisor acceptance and natural
+renewal remain pending. No stable egress release or autonomous access.
+
+## Unreleased lifecycle correction
+
+The published 1.0.0 image passed guarded inventory, but a supervised session
+did not exit normally on stdin EOF after authentication. The 1.0.1-rc.1
+candidate source addresses remote cleanup and bounded process shutdown;
+it is not yet published or accepted. Do not change the installed digest
+until a new artifact has passed review and supervised testing.
 
 ## Stable release status
 

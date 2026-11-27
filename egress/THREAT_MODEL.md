@@ -31,6 +31,12 @@ required; do not allow agents or privileged containers to modify them.
 - No persistent process, no automatic restart; stop project before removing
   firewall. Session locking only covers this launcher; legacy launches are
   a separate operational risk.
+- Supervise attached MCP and Squid exec clients. Independent 15-second
+  EOF deadline, bounded input buffering, failure on observed proxy exit,
+  deferred repeated termination signals during cleanup, and verified
+  project removal before guard deletion. This does not detect every hung
+  proxy, privileged policy mutation, or hard-killed manager. A failed
+  cleanup retains the guard and may require operator recovery.
 - No account data in tests, CI, logs or proxy configuration.
 
 ## Remaining limitations and tests

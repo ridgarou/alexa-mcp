@@ -16,6 +16,7 @@ COMMAND = Path("/usr/local/sbin/alexa-egress-manager")
 STATE = Path("/run/alexa-egress-manager")
 LAYOUT = {
     MANAGER: {"run.py": "run.py", "policy.py": "policy.py",
+              "supervisor.py": "supervisor.py",
               "probe.mjs": "probe.mjs", "readiness.mjs": "readiness.mjs"},
     CONFIG: {".env.example": ".env.example"},
     STACK: {"Dockerfile": "Dockerfile", ".dockerignore": ".dockerignore",

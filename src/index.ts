@@ -15,17 +15,23 @@ import { initAlexa, NO_AUTH, RELOGIN_REQUIRED } from "./alexa.js";
 import { writeRoutine, setRoutineEnabled, type TriggerSpec } from "./routines.js";
 import { flattenAppliances, collectRoutineTargets } from "./util.js";
 import { createDeviceStateQuery } from "./device-state.js";
+import { installShutdown } from "./shutdown.js";
 
 const queryDeviceState = createDeviceStateQuery();
 
 const ALLOW_WRITE = process.env.ALEXA_MCP_ALLOW_WRITE === "1";
 
 // -- Lazy Alexa singleton ---------------------------------------------------
+const session = new AbortController();
 let alexaPromise: Promise<AlexaRemote> | null = null;
 async function getAlexa(): Promise<AlexaRemote> {
+  session.signal.throwIfAborted();
   if (!alexaPromise) {
-    alexaPromise = initAlexa(undefined, /* interactive */ false)
-      .then((r) => r.alexa)
+    alexaPromise = initAlexa(undefined, /* interactive */ false, session.signal)
+      .then((r) => {
+        session.signal.throwIfAborted();
+        return r.alexa;
+      })
       .catch((err) => {
         alexaPromise = null; // retry on the next tool call
         throw err;
@@ -36,6 +42,7 @@ async function getAlexa(): Promise<AlexaRemote> {
 
 // Callback API -> Promise (the library uses (err, body) callbacks).
 function call<T>(fn: (cb: (err: any, body: T) => void) => void): Promise<T> {
+  if (session.signal.aborted) return Promise.reject(new Error("MCP session closing."));
   return new Promise((resolve, reject) =>
     fn((err, body) => (err ? reject(err) : resolve(body))),
   );
@@ -1066,7 +1073,15 @@ function hint(e: any): string {
 }
 
 const transport = new StdioServerTransport();
-await server.connect(transport);
+// Register before connecting so EOF or signals during startup are handled.
+installShutdown(session, () => server.close());
+try {
+  await server.connect(transport);
+} catch {
+  session.abort();
+  console.error("[alexa-mcp] Transport initialization failed. Details suppressed.");
+  process.exitCode = 1;
+}
 console.error(
   `[alexa-mcp] ready (write=${ALLOW_WRITE ? "ON" : "off"}). ` +
     `${ALLOW_WRITE ? "" : "Set ALEXA_MCP_ALLOW_WRITE=1 for trigger/delete tools."}`,

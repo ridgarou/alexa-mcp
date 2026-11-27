@@ -14,6 +14,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import shutil
+
+from supervisor import supervise
 
 from policy import (TABLE, PRIVATE_BR, OUTBOUND_BR, BLOCKED, DNS,
                     host_policy, namespace_policy, validate_networks, validate_domains,
@@ -35,6 +38,8 @@ ALEXA_EGRESS_SUBNET ALEXA_PROXY_EGRESS_IP ALEXA_EGRESS_GATEWAY
 ALEXA_EGRESS_UPLINK
 """.split())
 IMAGE = re.compile(r"(?:sha256:[0-9a-f]{64}|[a-z0-9./:_-]+@sha256:[0-9a-f]{64})\Z")
+cleaning = False
+interrupted_signal = None
 
 def note(message):
     print(message, file=sys.stderr, flush=True)
@@ -159,9 +164,11 @@ def check_auth(path):
                 if other == path or other in path.parents or path in other.parents:
                     raise RuntimeError("Another running container may access credentials")
 
-def install_nft(policy, prefix=()):
+def install_nft(policy, prefix=(), on_applied=None):
     cmd([*prefix, "nft", "-c", "-f", "-"], data=policy)
     cmd([*prefix, "nft", "-f", "-"], data=policy)
+    if on_applied is not None:
+        on_applied()
     # Verify both base chains and their installed rule count.
     result = js([*prefix, "nft", "-j", "list", "table", "inet", TABLE])
     actual = [x for x in result["nftables"] if "rule" in x]
@@ -255,19 +262,57 @@ def probe(cid, v, amazon=False):
         raise RuntimeError("Isolation probes failed or incomplete")
 
 
-def stop_project(env):
-    compose(env, ["down", "--timeout", "5"], timeout=45)
+def verify_project_absent():
     if project_containers() or project_networks():
         raise RuntimeError("Project cleanup incomplete")
+    if any(x["ifname"] in (PRIVATE_BR, OUTBOUND_BR)
+           for x in js(["ip", "-j", "link", "show"])):
+        raise RuntimeError("Project bridge cleanup incomplete")
+
+
+def stop_project(env):
+    try:
+        compose(env, ["down", "--timeout", "5"], timeout=45)
+        verify_project_absent()
+    except Exception:
+        # Best effort to stop only this project's remaining containers.
+        # Do not delete the guard or pretend cleanup succeeded on failure.
+        try:
+            remaining = project_containers()
+            if remaining:
+                cmd(DOCKER + ["stop", "--time", "5", *remaining], timeout=30)
+        except Exception:
+            pass
+        raise RuntimeError("Project cleanup incomplete; guard retained; inspect manually") from None
+
+
+def reap_client(process):
+    if process is None:
+        return
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
+
 
 def main():
+    global cleaning
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("run", "check"))
     parser.add_argument("--amazon", action="store_true",
                         help="also test unauthenticated HTTPS to one allowed Amazon host")
     parser.add_argument("--diagnostics", action="store_true",
                         help="synthetic check only: show bounded startup diagnostics on failure")
+    parser.add_argument("--lifecycle", choices=("mcp", "stuck"),
+                        help="synthetic check only: run stdio lifecycle acceptance")
     args = parser.parse_args()
+    if args.lifecycle and (args.mode != "check" or args.amazon):
+        parser.error("--lifecycle is restricted to synthetic offline check mode")
     if args.diagnostics and args.mode != "check":
         parser.error("--diagnostics is restricted to synthetic check mode")
     if os.geteuid() != 0:
@@ -277,7 +322,7 @@ def main():
         st = directory.stat()
         if st.st_gid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
             raise RuntimeError("Manager, configuration and stack directories must be root:root mode 0700")
-    for name in ("run.py", "policy.py", "probe.mjs", "readiness.mjs"):
+    for name in ("run.py", "policy.py", "supervisor.py", "probe.mjs", "readiness.mjs"):
         trusted_file(ROOT / name)
     for name in ("AlexaEgress.yml", "squid.conf.template", "allowed-domains.txt"):
         trusted_file(STACK / name)
@@ -290,7 +335,10 @@ def main():
     with contextlib.ExitStack() as stack:
         fd = os.open(STATE / "session.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         stack.callback(os.close, fd)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("EGRESS_SESSION_BUSY") from None
         env = load_env()
         v = addresses(env)
         if project_containers() or project_networks() or ("inet", TABLE) in nft_tables():
@@ -303,37 +351,42 @@ def main():
         if any(not re.fullmatch(r"sha256:[a-f0-9]{64}", i) for i in image_ids.values()):
             raise RuntimeError("Image identity unavailable")
         temp = Path(tempfile.mkdtemp(prefix="session-", dir=STATE))
-        # Config files are readable only inside the explicit read-only mount.
-        config = temp / "config"
-        config.mkdir(mode=0o755)
-        domains = validate_domains((STACK / "allowed-domains.txt").read_text())
-        (config / "allowed-domains.txt").write_text("\n".join(domains) + "\n")
-        squid = (STACK / "squid.conf.template").read_text()
-        squid = squid.replace("@CLIENT_IP@", v["app"]).replace("@PROXY_IP@", v["proxy"])
-        squid = squid.replace("@BLOCKED_IPV4@", " ".join(str(n) for n in ipaddress.collapse_addresses(ipaddress.IPv4Network(x) for x in (*BLOCKED, *extra))))
-        if "@" in squid:
-            raise RuntimeError("Unresolved Squid configuration")
-        (config / "squid.conf").write_text(squid)
-        for f in config.iterdir():
-            f.chmod(0o644)
-        env["ALEXA_EGRESS_CONFIG_DIR"] = str(config)
-        if args.mode == "check":
-            auth = temp / "synthetic-auth"
-            auth.mkdir(mode=0o700)
-            os.chown(auth, 1000, 1000)
-            env["ALEXA_MCP_AUTH_DIR"] = str(auth)
-        else:
-            check_auth(Path(env["ALEXA_MCP_AUTH_DIR"]))
         host_installed = False
         attempted_up = False
         squid_process = None
+        mcp_process = None
         startup_log = stack.enter_context(tempfile.TemporaryFile(mode="w+b")) if args.diagnostics else None
+
+        def mark_host_applied():
+            nonlocal host_installed
+            host_installed = True
+
         try:
+            # Config files are readable only inside the explicit read-only mount.
+            config = temp / "config"
+            config.mkdir(mode=0o755)
+            domains = validate_domains((STACK / "allowed-domains.txt").read_text())
+            (config / "allowed-domains.txt").write_text("\n".join(domains) + "\n")
+            squid = (STACK / "squid.conf.template").read_text()
+            squid = squid.replace("@CLIENT_IP@", v["app"]).replace("@PROXY_IP@", v["proxy"])
+            squid = squid.replace("@BLOCKED_IPV4@", " ".join(str(n) for n in ipaddress.collapse_addresses(ipaddress.IPv4Network(x) for x in (*BLOCKED, *extra))))
+            if "@" in squid:
+                raise RuntimeError("Unresolved Squid configuration")
+            (config / "squid.conf").write_text(squid)
+            for f in config.iterdir():
+                f.chmod(0o644)
+            env["ALEXA_EGRESS_CONFIG_DIR"] = str(config)
+            if args.mode == "check":
+                auth = temp / "synthetic-auth"
+                auth.mkdir(mode=0o700)
+                os.chown(auth, 1000, 1000)
+                env["ALEXA_MCP_AUTH_DIR"] = str(auth)
+            else:
+                check_auth(Path(env["ALEXA_MCP_AUTH_DIR"]))
             # Parse before creating any resources; no override/autoloaded Compose.
             note("STAGE: validate Compose and install host policy")
             compose(env, ["config", "--quiet"])
-            install_nft(host_policy(v, extra))
-            host_installed = True
+            install_nft(host_policy(v, extra), on_applied=mark_host_applied)
             attempted_up = True
             compose(env, ["up", "-d", "--no-build", "--pull", "never"], timeout=90)
             note("STAGE: inspect inert containers and networks")
@@ -411,47 +464,68 @@ def main():
             note("DNS_PUBLIC_NO_ROUTE: " + ("YES" if no_route else "NO"))
             if not all(evidence.values()):
                 raise RuntimeError("DNS guard evidence missing")
-            if args.mode == "run":
+            if args.mode == "run" or args.lifecycle:
                 check = cmd(DOCKER + ["exec", app, "node", "-p",
                     "process.versions.node"]).stdout.strip()
                 if tuple(map(int, check.split(".")[:2])) < (22, 21):
                     raise RuntimeError("Node lacks native environment proxy support")
+                if squid_process.poll() is not None:
+                    raise RuntimeError("EGRESS_PROXY_EXITED")
+                command = ["node", "dist/index.js"]
+                if args.lifecycle == "stuck":
+                    # Fixed offline fixture: consume stdin but intentionally
+                    # stay alive after EOF. Never load a real auth directory.
+                    command = ["node", "-e",
+                        "process.stdin.resume(); setInterval(() => {}, 1000);"]
+                mcp_process = subprocess.Popen(
+                    DOCKER + ["exec", "-i", app, *command],
+                    stdin=subprocess.PIPE, stdout=None, stderr=subprocess.DEVNULL,
+                    bufsize=0, env=ENV)
                 note("Guarded MCP session started; stdout reserved for MCP.")
-                result = cmd(DOCKER + ["exec", "-i", app, "node", "dist/index.js"],
-                             capture=False, timeout=None, check=False)
-                if result.returncode:
-                    raise RuntimeError("MCP process failed")
-            note("GUARDED_SESSION: PASS")
+                supervise(mcp_process, squid_process)
         finally:
-            # Keep firewall on any uncertain cleanup; never remove a preexisting table.
+            # Defer repeated termination signals during bounded cleanup.
+            # Remove the host guard only after verified project removal.
+            cleaning = True
             try:
-                if attempted_up:
-                    stop_project(env)
-            finally:
-                if squid_process is not None:
+                try:
+                    if attempted_up:
+                        stop_project(env)
+                    elif host_installed:
+                        verify_project_absent()
+                finally:
                     try:
-                        squid_process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        squid_process.terminate()
-                        try:
-                            squid_process.wait(timeout=3)
-                        except subprocess.TimeoutExpired:
-                            squid_process.kill()
-                            squid_process.wait()
-            if host_installed:
-                cmd(["nft", "delete", "table", "inet", TABLE])
-            import shutil
-            shutil.rmtree(temp)
+                        reap_client(mcp_process)
+                    finally:
+                        reap_client(squid_process)
+                if host_installed:
+                    cmd(["nft", "delete", "table", "inet", TABLE])
+                    if ("inet", TABLE) in nft_tables():
+                        raise RuntimeError("Guard table cleanup incomplete")
+                elif ("inet", TABLE) in nft_tables():
+                    raise RuntimeError("Uncertain guard ownership; inspect manually")
+                shutil.rmtree(temp)
+                note("EGRESS_CLEANUP: PASS")
+            finally:
+                cleaning = False
+        if interrupted_signal is not None:
+            raise KeyboardInterrupt
+        note("GUARDED_SESSION: PASS")
 
 if __name__ == "__main__":
     def interrupted(signum, frame):
-        raise KeyboardInterrupt
+        global interrupted_signal
+        if interrupted_signal is None:
+            interrupted_signal = signum
+        if not cleaning:
+            raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
     try:
         main()
     except KeyboardInterrupt:
         note("Guarded session interrupted; inspect cleanup if necessary.")
-        sys.exit(130)
+        sys.exit(128 + (interrupted_signal or signal.SIGINT))
     except Exception as exc:
         # Never output subprocess stderr, config values or credential details.
         note("GUARDED_SESSION: FAIL (" + type(exc).__name__ + ")")

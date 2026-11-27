@@ -9,7 +9,12 @@ container release versions are tracked separately.
 
 ### Added
 
-- Experimental, separately documented Squid egress component for supervised Spain-based inventory, with an independent Compose project, guarded on-demand launcher, host and namespace policy generation, and isolation tests. Uses the published 1.0.0 application digest as its initial baseline; no new application release or live guarded host acceptance claimed.
+- Experimental separate Squid egress component for supervised inventory, with an independent Compose project, root-controlled on-demand launcher, host and namespace network policy, synthetic isolation and lifecycle checks. Initial 1.0.0 host testing found an MCP EOF defect; the current provisional baseline is the published 1.0.1-rc.1 digest. Prior manager live read regression passed; independent supervisor validation remains pending.
+
+### Fixed
+
+- Prepare 1.0.1-rc.1: stop the upstream Alexa remote on MCP stdio EOF or termination signals, including pending initialization and late callbacks. Bound stuck process shutdown to a 10-second failure deadline without changing renewal intervals, read-only tools or dependencies.
+- The 1.0.0 guarded host inventory succeeded but normal closure timed out; Docker EOF and offline MCP closure passed. The candidate adds synthetic authenticated-process lifecycle regression tests. Live shutdown and renewal acceptance remain pending.
 
 ## [1.0.0] - 2026-11-27
 
