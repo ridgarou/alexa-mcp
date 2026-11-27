@@ -204,8 +204,9 @@ New builds require a new scan.
    separate checks when needed.
 5. Maintainer accepted residual risks on 2026-11-26 and reported completed
    live acceptance on 2026-11-27. Stable review, authorized promotion and manual
-   1.0.0 publication completed on 2026-11-27; stable-image host validation
-   remains pending.
+   1.0.0 publication completed on 2026-11-27; stable-image basic host regression and stored-session reuse subsequently
+   passed. Post-test credential metadata, cleanup and natural stable-image
+   renewal remain pending.
 6. Implement and verify outbound network restrictions with narrowly scoped
    Amazon destinations and request semantics. Do not present the bridge
    as an allowlist; do not blindly block all POST requests.
@@ -259,7 +260,7 @@ state retrieval separately. No retries to bypass a rate limit.
 
 ## ADR-011 — Stable publication acceptance gate
 
-**Date:** 2026-11-26 · **Status:** Accepted; 1.0.0 published, stable-image host acceptance pending.
+**Date:** 2026-11-26 · **Status:** Accepted; 1.0.0 published, basic host regression passed; remaining host checks pending.
 
 Reuse the single manual GHCR publication workflow for RC and stable
 SemVer, with the same build, security and immutable-tag gates. Stable
@@ -283,8 +284,11 @@ recorded; review and explicit merge/publication authorization remain
 separate requirements. Both authorized promotions and the manual stable
 publication completed on 2026-11-27. The exact publication source, digest
 and validation evidence are recorded in GHCR.md; no new publication is
-required for documentation-only changes. Host validation of the actual
-stable digest remains pending.
+required for documentation-only changes. The actual stable digest passed the maintainer-reported anonymous pull,
+offline tests, stored-session reuse and nine basic live read checks.
+Post-test credential metadata, cleanup and natural stable-image renewal
+remain pending. Independent egress development may proceed without forcing
+renewal; this does not authorize agent access or waive remaining tests.
 
 ## How to update this record
 

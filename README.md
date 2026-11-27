@@ -17,8 +17,9 @@ Docker configuration.
 > starting at `1.0.0-rc.1`. The current published stable version is `1.0.0`.
 > RC.2 remains available for rollback. Its supervised inventory, anonymous
 > pull and natural renewal were confirmed before stable publication.
-> The actual stable digest still requires anonymous pull and supervised host
-> acceptance before replacing a working deployment. Egress controls and a
+> The maintainer confirmed anonymous pull, offline tests, stored-session
+> reuse and nine basic live read checks on the stable image. Post-test
+> metadata checks and natural stable-image renewal remain pending. Egress controls and a
 > restricted agent gateway remain separate requirements. See
 > [CHANGELOG.md](CHANGELOG.md) and [stable acceptance](docs/STABLE_ACCEPTANCE.md).
 >
@@ -503,8 +504,9 @@ settings unchanged for normal operation.
 ## Stable release status
 
 Version 1.0.0 was published after the reviewed RC.2 acceptance and explicit
-manual approval. The fresh image passed publication validation; anonymous
-pull and supervised host acceptance of that digest remain pending. Keep
+manual approval. The fresh image passed publication validation and supervised basic
+host regression (nine of nine calls). Natural renewal on 1.0.0 and
+post-test metadata checks remain pending. Keep
 RC.2 for rollback. See [stable acceptance](docs/STABLE_ACCEPTANCE.md) for
 evidence and limitations.
 

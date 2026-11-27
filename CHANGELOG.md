@@ -21,7 +21,7 @@ accepted limitations. No dependency or runtime behavior changes from RC.2.
 - Linux amd64 child manifest: `sha256:171cebedd80558ee042d3f50e0328a3e595279c5665cc65dda011b4d3cf10602`.
 - Fresh 1.0.0 build, 28 unit tests, both 15-tool offline MCP checks, zero npm vulnerabilities, 157 verified signatures and 18 verified attestations.
 - Trivy: 52 unfixed high findings (13 distinct advisory IDs), zero critical and zero fixable findings. The current policy passed; this is not a vulnerability-free image.
-- Registry push and authenticated manifest inspection passed. Anonymous pull of the actual stable digest and supervised host smoke/regression remain pending. RC.2 acceptance is prior evidence, not a live test of the new image.
+- Registry push and authenticated manifest inspection passed. The maintainer subsequently confirmed anonymous stable-digest pull, image identity, offline MCP validation, stored-session reuse and nine basic live read-tool checks. Cold-cache transfer, post-test credential permissions and natural renewal on 1.0.0 have not yet been separately confirmed. See STABLE_ACCEPTANCE.md for scope.
 
 ### Changed
 

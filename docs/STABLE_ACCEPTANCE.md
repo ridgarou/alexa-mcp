@@ -1,6 +1,6 @@
 # Stable release acceptance
 
-## 1.0.0 — published; stable-image host acceptance pending
+## 1.0.0 — published; basic host regression passed
 
 Candidate: 1.0.0-rc.2, source commit
 `c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9`, GHCR digest
@@ -66,9 +66,14 @@ test client and server, not power draw. Keep the existing 384 MiB limit.
   PR #15 conventional merge into main; exact reviewed tree and both parents verified.
 - [x] Explicit manual approval, fresh build, scan, registry push and
   authenticated manifest verification completed on 2026-11-27.
-- [ ] Verify anonymous pull of the actual stable digest; repeat supervised
-  host smoke/regression and credential reuse checks. Observe natural renewal
-  without forcing login or changing the renewal interval. Keep RC.2 for rollback.
+- [x] Maintainer confirmed anonymous stable-digest pull, image identity,
+  pre-session credential permission and concurrent-session checks, and offline MCP validation.
+- [x] Supervised stable-image inventory and nine basic read-tool regression
+  checks passed using existing credentials.
+- [ ] Confirm post-test credential ownership/mode and temporary container cleanup.
+- [ ] Observe natural renewal on 1.0.0 without forcing login or changing
+  the renewal interval. Keep RC.2 for rollback. A clean-environment cold
+  pull remains an additional recommended check.
 
 Stable publication uses the existing manual workflow with both explicit
 approval inputs and the reviewed acceptance record. The workflow verifies
@@ -84,9 +89,48 @@ A fresh image with embedded 1.0.0 was built and validated; RC.2 was not retagged
 - Linux amd64 child manifest: `sha256:171cebedd80558ee042d3f50e0328a3e595279c5665cc65dda011b4d3cf10602`.
 - Fresh 1.0.0 build, 28 unit tests, both 15-tool offline MCP checks, zero npm vulnerabilities, 157 verified signatures and 18 verified attestations.
 - Trivy: 52 unfixed high findings (13 distinct advisory IDs), zero critical and zero fixable findings. The current policy passed; this is not a vulnerability-free image.
-- Registry push and authenticated manifest inspection passed. Anonymous pull of the actual stable digest and supervised host smoke/regression remain pending. RC.2 acceptance is prior evidence, not a live test of the new image.
+- Registry push and authenticated manifest inspection passed. The maintainer subsequently confirmed anonymous stable-digest pull, image identity, offline MCP validation, stored-session reuse and nine basic live read-tool checks. Cold-cache transfer, post-test credential permissions and natural renewal on 1.0.0 have not yet been separately confirmed. See STABLE_ACCEPTANCE.md for scope.
 
-No stable-image live or cold-cache test is claimed yet. Keep RC.2 for rollback.
+## Supervised stable-image host regression
+
+The maintainer confirmed the anonymous pull and identity checks, pre-session
+credential permissions and absence of concurrent sessions; exact command
+outputs for those preliminary checks were not supplied. The offline test
+reported PASS for the exact 15-tool inventory, schemas, invalid arguments
+and missing authentication. The stable live smoke reported embedded version
+1.0.0, 15 registered tools, a successful nonempty device inventory in
+1719 ms, and process exit 0. Existing credentials were reused.
+
+A subsequent single-session regression reported the following sanitized
+results (milliseconds per tool):
+
+| Tool | Result | Duration (ms) |
+|---|---|---:|
+| alexa_list_devices | PASS | 1617 |
+| alexa_list_routines | PASS | 199 |
+| alexa_list_scenes | PASS | 606 |
+| alexa_list_smarthome_devices | PASS | 1555 |
+| alexa_list_groups | PASS | 106 |
+| alexa_get_volumes | PASS | 112 |
+| alexa_get_do_not_disturb | PASS | 140 |
+| alexa_list_lists | PASS | 267 |
+| alexa_audit_broken_references | PASS | 727 |
+
+Nine passed, zero failed, STABLE_REGRESSION PASS, exit 0.
+These are maintainer-reported basic successful response checks, not
+exhaustive semantic validation, packet traces or a long-duration benchmark.
+Six other registered tools were not called during this regression, including
+the live device-state query, which was deliberately omitted to avoid
+unnecessary upstream throttling. Prior RC.2 coverage is not attributed to
+the new stable image. No private device counts, names, identifiers or raw
+credential data are recorded.
+
+Confirm post-test credential metadata and that the transient container has
+been removed. Natural renewal specifically on 1.0.0 is not yet demonstrated;
+observe it when normally due. Authentication code and dependency versions
+are unchanged from RC.2, whose natural renewal passed. This pending
+observation need not delay independent Egress Proxy development, but must
+not be marked passed. Keep the existing rollback configuration and image.
 
 Stable means a supervised read-only inventory application, not a guarantee
 of all upstream endpoints, zero vulnerabilities, verified long-term
