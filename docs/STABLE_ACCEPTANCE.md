@@ -1,6 +1,6 @@
 # Stable release acceptance
 
-## 1.0.0 preparation — live acceptance complete; review and publication pending
+## 1.0.0 — published; stable-image host acceptance pending
 
 Candidate: 1.0.0-rc.2, source commit
 `c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9`, GHCR digest
@@ -62,17 +62,31 @@ test client and server, not power draw. Keep the existing 384 MiB limit.
 - [x] Record completed evidence and update stable-acceptance.json for 1.0.0.
   The maintainer's explicit residual-risk acceptance and reported checks
   satisfy the live acceptance gate; this record is not merge or publish consent.
-- [ ] Pass required CI on the reviewed PR head, obtain explicit merge approval,
-  and promote through develop and main using the normal PR process.
-- [ ] Obtain explicit publication approval; build, scan and publish the exact
-  tested 1.0.0 image using the manual workflow. Record and validate its digest.
+- [x] Required CI passed; maintainer authorized PR #13 squash into develop and
+  PR #15 conventional merge into main; exact reviewed tree and both parents verified.
+- [x] Explicit manual approval, fresh build, scan, registry push and
+  authenticated manifest verification completed on 2026-11-27.
+- [ ] Verify anonymous pull of the actual stable digest; repeat supervised
+  host smoke/regression and credential reuse checks. Observe natural renewal
+  without forcing login or changing the renewal interval. Keep RC.2 for rollback.
 
 Stable publication uses the existing manual workflow with both explicit
 approval inputs and the reviewed acceptance record. The workflow verifies
 the record, not the actual remote account or host. CI must remain secret-free.
-Build and validate a fresh image with embedded 1.0.0; never retag RC.2.
-Record the resulting digest, then repeat host smoke and regression checks
-on the actual stable image. Keep RC.2 for rollback.
+A fresh image with embedded 1.0.0 was built and validated; RC.2 was not retagged.
+
+## Published stable artifact — 2026-11-27
+
+- Published 2026-11-27 (18:34 UTC), source commit [`1b45d5dd20d2543eeb89a6968d1b19128d38fdf5`](https://github.com/ridgarou/alexa-mcp/commit/1b45d5dd20d2543eeb89a6968d1b19128d38fdf5).
+- [Manual publication workflow 46050387909](https://github.com/ridgarou/alexa-mcp/actions/runs/46050387909) passed.
+- Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862`.
+- Linux amd64 child manifest: `sha256:171cebedd80558ee042d3f50e0328a3e595279c5665cc65dda011b4d3cf10602`.
+- Fresh 1.0.0 build, 28 unit tests, both 15-tool offline MCP checks, zero npm vulnerabilities, 157 verified signatures and 18 verified attestations.
+- Trivy: 52 unfixed high findings (13 distinct advisory IDs), zero critical and zero fixable findings. The current policy passed; this is not a vulnerability-free image.
+- Registry push and authenticated manifest inspection passed. Anonymous pull of the actual stable digest and supervised host smoke/regression remain pending. RC.2 acceptance is prior evidence, not a live test of the new image.
+
+No stable-image live or cold-cache test is claimed yet. Keep RC.2 for rollback.
 
 Stable means a supervised read-only inventory application, not a guarantee
 of all upstream endpoints, zero vulnerabilities, verified long-term

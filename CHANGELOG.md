@@ -7,10 +7,31 @@ container release versions are tracked separately.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [1.0.0] - 2026-11-27
+
+First stable release, for supervised local read-only inventory within the
+accepted limitations. No dependency or runtime behavior changes from RC.2.
+
+- Published 2026-11-27 (18:34 UTC), source commit [`1b45d5dd20d2543eeb89a6968d1b19128d38fdf5`](https://github.com/ridgarou/alexa-mcp/commit/1b45d5dd20d2543eeb89a6968d1b19128d38fdf5).
+- [Manual publication workflow 46050387909](https://github.com/ridgarou/alexa-mcp/actions/runs/46050387909) passed.
+- Tag: `ghcr.io/ridgarou/alexa-mcp:1.0.0`.
+- Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:52f989c09e95748e4c853c5db705a0ba6b3b642e7394078b68b979f7e7228862`.
+- Linux amd64 child manifest: `sha256:171cebedd80558ee042d3f50e0328a3e595279c5665cc65dda011b4d3cf10602`.
+- Fresh 1.0.0 build, 28 unit tests, both 15-tool offline MCP checks, zero npm vulnerabilities, 157 verified signatures and 18 verified attestations.
+- Trivy: 52 unfixed high findings (13 distinct advisory IDs), zero critical and zero fixable findings. The current policy passed; this is not a vulnerability-free image.
+- Registry push and authenticated manifest inspection passed. Anonymous pull of the actual stable digest and supervised host smoke/regression remain pending. RC.2 acceptance is prior evidence, not a live test of the new image.
+
 ### Changed
 
-- Prepare independent stable version 1.0.0 with no dependency or application behavior changes from RC.2. Extend the manual GHCR workflow to accept stable SemVer only after explicit stable approval and a reviewed version-specific acceptance record. Live acceptance is complete; review, explicit merge approval, fresh build validation and explicit publication remain required. See [STABLE_ACCEPTANCE.md](docs/STABLE_ACCEPTANCE.md).
-- Record sanitized RC.2 host regression, credential reuse, natural renewal and anonymous pull evidence (2026-11-27; cached layers). Retain the accepted device-state and short-duration performance limitations.
+- Adopt stable version metadata and the manual publication gate requiring
+  explicit stable approval and a reviewed version-specific acceptance record.
+- Record sanitized RC.2 host regression, credential reuse, natural renewal
+  and anonymous pull evidence (2026-11-27; cached layers). Preserve the
+  accepted device-state and short-duration performance limitations.
+- Retain RC.2 for rollback. Egress enforcement and restricted agent access
+  are separate future features, not part of this release.
 
 ## [1.0.0-rc.2] - 2026-11-26
 
@@ -22,7 +43,7 @@ Second release candidate, published to GHCR after the device-state correction.
 - Immutable image reference: `ghcr.io/ridgarou/alexa-mcp@sha256:a023d51612ab00a579e3fb2e7d2c9c4568d2131bf9912f5a3a06c12d1836a810`.
 - Publication passed 28 unit tests, both 15-tool offline MCP checks, npm audit (zero vulnerabilities), 157 registry signatures and 18 attestations.
 - Trivy reported 52 high findings without available fixes (13 distinct advisories), zero critical and zero fixable findings.
-- Registry push and authenticated manifest inspection passed. At publication, anonymous pull, live regression and credential renewal were pending; subsequent supervised acceptance is recorded under Unreleased and in STABLE_ACCEPTANCE.md. Successful device-state retrieval remains unverified.
+- Registry push and authenticated manifest inspection passed. At publication, anonymous pull, live regression and credential renewal were pending; subsequent supervised acceptance is recorded under 1.0.0 and in STABLE_ACCEPTANCE.md. Successful device-state retrieval remains unverified.
 - PR #10 required ancestry reconciliation because earlier merge results had a single parent despite a conventional merge being requested. The reconciled commit retained the exact reviewed tree; PR #10 passed CI and its final merge has both expected parents.
 
 ### Fixed
@@ -203,7 +224,8 @@ The original MIT license and attribution are retained.
   corresponding tag or release. Keep an empty Unreleased section at the top.
 - Do not record credentials, private host configuration or personal data.
 
-[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/c61c23a4faa6b3508e28f97cb1a0f33a4622e7b9...develop
+[Unreleased]: https://github.com/ridgarou/alexa-mcp/compare/1b45d5dd20d2543eeb89a6968d1b19128d38fdf5...develop
+[1.0.0]: https://github.com/ridgarou/alexa-mcp/actions/runs/46050387909
 [1.0.0-rc.2]: https://github.com/ridgarou/alexa-mcp/actions/runs/45788085719
 [1.0.0-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45770005405
 [0.7.0-hardened.1-rc.1]: https://github.com/ridgarou/alexa-mcp/actions/runs/45766872771

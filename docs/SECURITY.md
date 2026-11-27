@@ -1,7 +1,7 @@
 # Hardened fork — security and acceptance status
 
-The current published image is RC.2; stable 1.0.0 is prepared but not yet
-published. It is based on upstream commit
+The current published stable image is 1.0.0; its supervised host acceptance
+is pending. RC.2 is retained for rollback. It is based on upstream commit
 a369d5f86858d8d43d4a982bedc5bffdaacccf0c. Preserve upstream MIT notices.
 
 ## Build and review
@@ -74,7 +74,9 @@ auth logs. The normal server must not intentionally expose login ports.
   sessions on the deployment host; offline tests cover simulated failure.
 - Enforce outbound network restrictions; a dedicated bridge alone is not
   an egress allowlist.
-- Manual GHCR candidate publication passed for 1.0.0-rc.2; see [GHCR.md](GHCR.md).
+- Manual GHCR publication passed for 1.0.0 and its preceding RC.2; see
+  [GHCR.md](GHCR.md). The stable publication scan reported 52 unfixed high
+  findings (13 unique advisories), zero critical and zero fixable findings.
   RC.1 stored-session reuse and 14/15 basic live read checks passed. RC.2
   live regression and controlled timeout passed; successful state retrieval
   remains unverified. Natural RC.2 renewal and anonymous pull were confirmed
